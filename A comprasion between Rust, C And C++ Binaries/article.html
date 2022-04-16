@@ -1,0 +1,464 @@
+<head>
+    <title>A comprasion between C, C++ and Rust executables</title>
+</head>
+
+<body>
+    <h1>A comprasion between C, C++ and Rust executables</h1>
+    <b>In this post i'm going to compare the C, C++ and Rust version of a program that printf "Enter password: ", reads the password from the user and compares it to "p@ssw0rd"</b>
+
+    <h2>Here's the C source code: </h2>
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+        #include &lt;string.h&gt;
+
+        int main(int argc, char **argv)
+        {
+            char buf[100];
+    
+            printf("Enter password: ");
+
+            scanf("%99s", &amp;buf);
+
+            if (!strcmp(buf, "p@ssw0rd"))
+            {
+                printf("Correct!\n");
+            }
+            else
+            {
+                printf("Incorrect...\n");
+            }
+        }
+    </code>
+
+    <b>Size of the executable (in bytes): 16152</b>
+
+    <p>
+        Let's analyze the code: a buffer of size 100 is declared, "Enter password:" if printf'd, a string of size 99 is scanned into pass, pass is compared to "p@ssw0rd".
+        if the comprasion returned 0, "Correct!" is printed. otherwise "Incorrect...\n" is printed.
+    </p>
+    
+    <h3>Here's the assembly: </h3>
+
+    <code style="display: block; white-space: pre-wrap;">
+        |           ; var char **var_80h @ rbp-0x80
+|           ; var int64_t var_74h @ rbp-0x74
+|           ; var char *s1 @ rbp-0x70
+|           ; var int64_t var_8h @ rbp-0x8
+|           ; arg int argc @ rdi
+|           ; arg char **argv @ rsi
+|           0x00001179      55             push rbp
+|           0x0000117a      4889e5         mov rbp, rsp
+|           0x0000117d      4883c480       add rsp, 0xffffffffffffff80
+|           0x00001181      897d8c         mov dword [var_74h], edi    ; argc
+|           0x00001184      48897580       mov qword [var_80h], rsi    ; argv
+|           0x00001188      64488b042528.  mov rax, qword fs:[0x28]
+|           0x00001191      488945f8       mov qword [var_8h], rax
+|           0x00001195      31c0           xor eax, eax
+|           0x00001197      488d05660e00.  lea rax, str.Enter_password:_ ; 0x2004 ; "Enter password: "
+|           0x0000119e      4889c7         mov rdi, rax                ; const char *format
+|           0x000011a1      b800000000     mov eax, 0
+|           0x000011a6      e8a5feffff     call sym.imp.printf         ; int printf(const char *format)
+|           0x000011ab      488d4590       lea rax, [s1]
+|           0x000011af      4889c6         mov rsi, rax
+|           0x000011b2      488d055c0e00.  lea rax, str._99s           ; 0x2015 ; "%99s"
+|           0x000011b9      4889c7         mov rdi, rax                ; const char *format
+|           0x000011bc      b800000000     mov eax, 0
+|           0x000011c1      e8aafeffff     call sym.imp.__isoc99_scanf ; int scanf(const char *format)
+|           0x000011c6      488d4590       lea rax, [s1]
+|           0x000011ca      488d15490e00.  lea rdx, str.p_ssw0rd       ; 0x201a ; "p@ssw0rd"
+|           0x000011d1      4889d6         mov rsi, rdx                ; const char *s2
+|           0x000011d4      4889c7         mov rdi, rax                ; const char *s1
+|           0x000011d7      e884feffff     call sym.imp.strcmp         ; int strcmp(const char *s1, const char *s2)
+|           0x000011dc      85c0           test eax, eax
+|       ,=&lt; 0x000011de      7511           jne 0x11f1
+|       |   0x000011e0      488d053c0e00.  lea rax, str.Correct_       ; 0x2023 ; "Correct!"
+|       |   0x000011e7      4889c7         mov rdi, rax                ; const char *s
+|       |   0x000011ea      e841feffff     call sym.imp.puts           ; int puts(const char *s)
+|      ,==&lt; 0x000011ef      eb0f           jmp 0x1200
+|      ||   ; CODE XREF from main @ 0x11de
+|      |`-&gt; 0x000011f1      488d05340e00.  lea rax, str.Incorrect...   ; 0x202c ; "Incorrect..."
+|      |    0x000011f8      4889c7         mov rdi, rax                ; const char *s
+|      |    0x000011fb      e830feffff     call sym.imp.puts           ; int puts(const char *s)
+|      |    ; CODE XREF from main @ 0x11ef
+|      `--&gt; 0x00001200      b800000000     mov eax, 0
+|           0x00001205      488b55f8       mov rdx, qword [var_8h]
+|           0x00001209      64482b142528.  sub rdx, qword fs:[0x28]
+|       ,=&lt; 0x00001212      7405           je 0x1219
+|       |   0x00001214      e827feffff     call sym.imp.__stack_chk_fail
+|       |   ; CODE XREF from main @ 0x1212
+|       `-&gt; 0x00001219      c9             leave
+\           0x0000121a      c3             ret
+    </code>
+
+    <p>
+        this code is pretty simillar to the c code. the code really starts when "Enter password: " is loaded into rax and then into rdi. printf is called to print the string in rdi.
+        now pass is loaded into rax and then into rsi, the format string "%99s" is loaded into rax and then into rdi and scanf is called to recieve the input. the string in pass is loaded into rdi, 
+        and "p@ssw0rd" is loaded into rsi. strcmp() is called and test eax, eax checks if eax is zero. if it is that means the strcmp was successful and the execution flow continues to print "Correct!"
+        and then jumps into the exit part. If strcmp() didn't return zero, the program jumps and prints "Incorrect...". The execution continues to the exit part.
+    </p>
+
+    <h3>Psuedocode: </h3>
+    <i style="display: block; white-space: pre-wrap;">
+        let pass
+
+        load "Enter password: " to rdi
+        call printf
+
+        load the pass into rsi
+        load "%99s" to rdi
+
+        call scanf
+
+        load the string in pass into rdi
+        load "p@ssw0rd" into rsi
+
+        result = call strcmp
+
+        if result != 0:
+            load "Incorrect..." to rdi
+            call printf
+            
+            jump to exit
+        
+        load "Correct!" to rdi
+        call printf
+
+        jump to exit
+    </i>
+
+    <h2>Here's the C++ source code: </h2>
+        
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;iostream&gt;
+        #include &lt;cstring&gt;
+
+        int main(int argc, char **argv)
+        {
+            char *pass;
+
+            std::cout &lt;&lt; "Enter password: ";
+
+            std::cin &gt;&gt; pass;
+
+            if (!strcmp(pass, "p@ssw0rd"))
+            {
+                std::cout &lt;&lt; "Correct!";
+            }
+            else
+            {
+                std::cout &lt;&lt; "Incorrect...";
+            }
+
+            return 0;
+        } 
+    </code>
+
+    <b>Size of the executable (in Bytes): 16776</b>
+
+    <p>
+        This code starts by decalring pass as a char pointer (not as a C++ string!). "Enter password: " is printed to std::cout and the data which is read from std::cin is loaded into pass.
+        strcmp is called and from now everything is exactly the same.
+    </p>
+
+    <h3>Here's the assembly: </h3>
+
+    <code style="display: block; white-space: pre-wrap;">
+                   ; DATA XREF from entry0 @ 0x10a8
+/ 147: int main (int argc, char **argv);
+|           ; var char **var_20h @ rbp-0x20
+|           ; var int64_t var_14h @ rbp-0x14
+|           ; var char *s1 @ rbp-0x8
+|           ; arg int argc @ rdi
+|           ; arg char **argv @ rsi
+|           0x00001189      55             push rbp
+|           0x0000118a      4889e5         mov rbp, rsp
+|           0x0000118d      4883ec20       sub rsp, 0x20
+|           0x00001191      897dec         mov dword [var_14h], edi    ; argc
+|           0x00001194      488975e0       mov qword [var_20h], rsi    ; argv
+|           0x00001198      488d05650e00.  lea rax, str.Enter_password:_ ; 0x2004 ; "Enter password: "
+|           0x0000119f      4889c6         mov rsi, rax
+|           0x000011a2      488d05d72e00.  lea rax, obj.std::cout      ; 0x4080
+|           0x000011a9      4889c7         mov rdi, rax
+|           0x000011ac      e89ffeffff     call sym std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;std::char_traits&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char const*) ; sym.imp.std::basic_ostream_char__std::char_traits_char____std::operator____std::char_traits_char____std::basic_ostream_char__std::char_traits_char_____char_const_
+|           0x000011b1      488b45f8       mov rax, qword [s1]
+|           0x000011b5      4889c6         mov rsi, rax                ; int64_t arg2
+|           0x000011b8      488d05e12f00.  lea rax, obj.std::cin       ; 0x41a0
+|           0x000011bf      4889c7         mov rdi, rax                ; int64_t arg1
+|           0x000011c2      e8e7000000     call method std::basic_istream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&gt;&gt;&lt;char, std::char_traits&lt;char&gt; &gt;(std::basic_istream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char*) ; method.std::basic_istream_char__std::char_traits_char____std::operator___char__std.char_traits_char____std::basic_istream_char__std::char_traits_char_____char_
+|           0x000011c7      488b45f8       mov rax, qword [s1]
+|           0x000011cb      488d15430e00.  lea rdx, str.p_ssw0rd       ; 0x2015 ; "p@ssw0rd"
+|           0x000011d2      4889d6         mov rsi, rdx                ; const char *s2
+|           0x000011d5      4889c7         mov rdi, rax                ; const char *s1
+|           0x000011d8      e883feffff     call sym.imp.strcmp         ; int strcmp(const char *s1, const char *s2)
+|           0x000011dd      85c0           test eax, eax
+|       ,=&lt; 0x000011df      751b           jne 0x11fc
+|       |   0x000011e1      488d05360e00.  lea rax, str.Correct__n     ; 0x201e ; "Correct!
+"
+|       |   0x000011e8      4889c6         mov rsi, rax
+|       |   0x000011eb      488d058e2e00.  lea rax, obj.std::cout      ; 0x4080
+|       |   0x000011f2      4889c7         mov rdi, rax
+|       |   0x000011f5      e856feffff     call sym std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;std::char_traits&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char const*) ; sym.imp.std::basic_ostream_char__std::char_traits_char____std::operator____std::char_traits_char____std::basic_ostream_char__std::char_traits_char_____char_const_
+|      ,==&lt; 0x000011fa      eb19           jmp 0x1215
+|      ||   ; CODE XREF from main @ 0x11df
+|      |`-&gt; 0x000011fc      488d05250e00.  lea rax, str.Incorrect..._n ; 0x2028 ; "Incorrect...
+"
+|      |    0x00001203      4889c6         mov rsi, rax
+|      |    0x00001206      488d05732e00.  lea rax, obj.std::cout      ; 0x4080
+|      |    0x0000120d      4889c7         mov rdi, rax
+|      |    0x00001210      e83bfeffff     call sym std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp; std::operator&lt;&lt; &lt;std::char_traits&lt;char&gt; &gt;(std::basic_ostream&lt;char, std::char_traits&lt;char&gt; &gt;&amp;, char const*) ; sym.imp.std::basic_ostream_char__std::char_traits_char____std::operator____std::char_traits_char____std::basic_ostream_char__std::char_traits_char_____char_const_
+|      |    ; CODE XREF from main @ 0x11fa
+|      `--&gt; 0x00001215      b800000000     mov eax, 0
+|           0x0000121a      c9             leave
+\           0x0000121b      c3             ret
+    </code>
+
+    <p>
+        Like the C code, this code really starts when "Enter password: " is loaded into rax and then into rsi. Now, the address of the object std::cout is loaded into rdi. the function std::basic_ostream
+        is called to print the string in rsi. this is the C++ version of the C printf code we saw earlier. now, pass is moved into rsi and the object std::cin is loaded into rdi. std::basic_istream
+        is called and the input is loaded into pass. Note that here, the input size is NOT limited. this is the C++ version of the C scanf code. from now on everything is the same except printf
+        is replaced with std::cout.
+    </p>
+
+    <h3>Psuedocode: </h3>
+
+    <i style="display: block; white-space: pre-wrap;">
+        let pass;
+
+        load "Enter password: " to rsi
+        load the address of the object std::cout to rdi
+
+        call std::basic_ostream
+
+        load pass to rsi
+        load the address of the object std::cin to rdi
+
+        call std::basic_istream
+        
+        .
+        .
+        .
+    </i>
+
+    <h2>Here's the Rust version: </h2>
+
+    <code style="display: block; white-space: pre-wrap;">
+        use std::io::{stdin};
+
+        fn main()
+        {
+            let mut pass = String::new();
+
+            stdin().read_line(&amp;mut pass);
+
+            if pass.trim() == "p@ssw0rd"
+            {
+                println!("Correct!");
+            }  
+            else
+            {
+                println!("Incorrect...");
+            }
+            }
+    </code>
+
+    <b>Size of the executable (in bytes): 8318360</b>
+
+    <p>
+        This executable Is much larger than the previous ones. that is because Rust is a statically linked language. that means all of the routines the program uses are loaded in the binary itself.
+    </p>
+
+    <p>
+        This code declares pass as a mutable string and initializes it to String::new(). it calls read_line with an argument of the mutable reference to pass on stdin.
+        Now, the code compares the trimmed version of pass (No whitespaces) to "p@ssw0rd". If the comprasion was successful it prints "Correct!". otherwise it prints "Incorrect..."
+    </p>
+
+    <h3>Here's the assembly: </h3>
+        
+    <code style="display: block; white-space: pre-wrap;">
+                    ; DATA XREF from entry0 @ 0x7b38
+/ 21: int main (int argc, char **argv);
+|           ; arg int argc @ rdi
+|           ; arg char **argv @ rsi
+|           0x00008830      50             push rax
+|           0x00008831      4889f2         mov rdx, rsi                ; int64_t arg3
+|           0x00008834      4863f7         movsxd rsi, edi             ; int64_t arg2
+|           0x00008837      488d3da2fdff.  lea rdi, [sym.src::main::hc7c3432ba867720f] ; 0x85e0 ; "H\x81\xec\xe8" ; int64_t arg1
+|           0x0000883e      e83d080000     call sym std::rt::lang_start::h91859ff225f4779a ; sym.std::rt::lang_start::h91859ff225f4779a
+|           0x00008843      59             pop rcx
+\           0x00008844      c3             ret
+    </code>
+
+    <p>
+        So rust first loads the address of our actual main funtion into rdi and then calls lang_start. This is different than the C/C++ versions. I don't know what lang_start does
+        but eventually it calls our actual main function.
+    </p>
+
+    <h3>Here's the main function's source code: </h3>
+
+    <code style="display: block; white-space: pre-wrap;">
+        
+               ; DATA XREF from main @ 0x8837
+/ 317: sym.src::main::hc7c3432ba867720f ();
+|           ; var int64_t var_7h @ rsp+0x7
+|           ; var int64_t var_8h @ rsp+0x8
+|           ; var int64_t var_10h @ rsp+0x10
+|           ; var int64_t var_18h @ rsp+0x18
+|           ; var int64_t var_20h @ rsp+0x20
+|           ; var int64_t var_28h @ rsp+0x28
+|           ; var int64_t var_30h @ rsp+0x30
+|           ; var int64_t var_48h @ rsp+0x48
+|           ; var int64_t var_60h @ rsp+0x60
+|           ; var int64_t var_68h @ rsp+0x68
+|           ; var int64_t var_70h @ rsp+0x70
+|           ; var int64_t var_78h @ rsp+0x78
+|           ; var int64_t var_a8h @ rsp+0xa8
+|           0x000085e0      4881ece80000.  sub rsp, 0xe8               ; src::main::hc7c3432ba867720f
+|           0x000085e7      488d7c2430     lea rdi, [var_30h]          ; int64_t arg1
+|           (*) 0x000085ec      e8af060000     call sym alloc::string::String::new::h23e41f2cf6159f13 ; sym.alloc::string::String::new::h23e41f2cf6159f13
+|           0x000085f1      488d05b81c01.  lea rax, [sym.std::io::stdio::stdin::h35f7187a3d40037d] ; 0x1a2b0 ; "PH°]"
+|           0x000085f8      ffd0           call rax
+|           0x000085fa      4889442428     mov qword [var_28h], rax
+|       ,=&lt; 0x000085ff      eb00           jmp 0x8601
+|       |   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x85ff
+|       `-&gt; 0x00008601      488b442428     mov rax, qword [var_28h]
+|           0x00008606      4889442460     mov qword [var_60h], rax
+|           0x0000860b      488d05ce1c01.  lea rax, [sym.std::io::stdio::Stdin::read_line::h65cece326c44d417] ; 0x1a2e0 ; "UAWAVATSHìI	ÖI	ÿHH;ÿ²\x03"
+|           0x00008612      488d7c2448     lea rdi, [var_48h]
+|           0x00008617      488d742460     lea rsi, [var_60h]
+|           0x0000861c      488d542430     lea rdx, [var_30h]
+|           0x00008621      ffd0           call rax
+|       ,=&lt; 0x00008623      eb25           jmp 0x864a
+        |   ; CODE XREF from src::main::hc7c3432ba867720f @ +0x68 ; sym.src::main::hc7c3432ba867720f
+..
+|     | |   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x8623
+|     | `-&gt; 0x0000864a      488d7c2448     lea rdi, [var_48h]          ; uint32_t arg1
+|     |     0x0000864f      e80c050000     call sym core::ptr::drop_in_place&lt;core::result::Result&lt;usize,std::io::error::Error&gt;&gt;::h96a6b0773d967b0c ; sym.core::ptr::drop_in_place_core::result::Result_usize_std::io::error::Error__::h96a6b0773d967b0c
+|     | ,=&lt; 0x00008654      eb00           jmp 0x8656
+|     | |   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x8654
+|     | `-&gt; 0x00008656      488d7c2430     lea rdi, [var_30h]          ; int64_t arg1
+|     |     0x0000865b      e880060000     call sym &lt;alloc::string::String as core::ops::deref::Deref&gt;::deref::h6b83c6ad84f27c48 ; sym._alloc::string::String_as_core::ops::deref::Deref_::deref::h6b83c6ad84f27c48
+|     |     0x00008660      4889542418     mov qword [var_18h], rdx
+|     |     0x00008665      4889442420     mov qword [var_20h], rax
+|     | ,=&lt; 0x0000866a      eb00           jmp 0x866c
+|     | |   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x866a
+|     | `-&gt; 0x0000866c      488b742418     mov rsi, qword [var_18h]    ; int64_t arg2
+|     |     0x00008671      488b7c2420     mov rdi, qword [var_20h]    ; int64_t arg1
+|     |     0x00008676      e865100000     call sym core::str::_&lt;impl str&gt;::trim::h9d1fea9f17338f92 ; sym.core::str::__impl_str_::trim::h9d1fea9f17338f92
+|     |     0x0000867b      4889542408     mov qword [var_8h], rdx
+|     |     0x00008680      4889442410     mov qword [var_10h], rax
+|     | ,=&lt; 0x00008685      eb00           jmp 0x8687
+|     | |   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x8685
+|     | `-&gt; 0x00008687      488b442408     mov rax, qword [var_8h]
+|     |     0x0000868c      488b4c2410     mov rcx, qword [var_10h]
+|     |     0x00008691      48894c2468     mov qword [var_68h], rcx
+|     |     0x00008696      4889442470     mov qword [var_70h], rax
+|     |     0x0000869b      488d35264b04.  lea rsi, [0x0004d1c8]       ; int64_t arg2
+|     |     0x000086a2      488d7c2468     lea rdi, [var_68h]          ; int64_t arg1
+|     |     0x000086a7      e834090000     call sym core::cmp::impls::_&lt;impl core::cmp::PartialEq&lt;&amp;B&gt; for &amp;A&gt;::eq::hcf3623dea7e76b2d ; sym.core::cmp::impls::__impl_core::cmp::PartialEq_B__for_A_::eq::hcf3623dea7e76b2d
+|     |     0x000086ac      88442407       mov byte [var_7h], al
+|     | ,=&lt; 0x000086b0      eb00           jmp 0x86b2
+|     | |   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x86b0
+|     | `-&gt; 0x000086b2      8a442407       mov al, byte [var_7h]
+|     |     0x000086b6      a801           test al, 1
+|     | ,=&lt; 0x000086b8      7529           jne 0x86e3
+|     |,==&lt; 0x000086ba      eb00           jmp 0x86bc
+|     |||   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x86ba
+|     |`--&gt; 0x000086bc      488d35254b04.  lea rsi, [0x0004d1e8]       ; int64_t arg2
+|     | |   0x000086c3      488d0d7e5903.  lea rcx, str.Incorrect..._n ; 0x3e048 ; "Incorrect...
+" ; int64_t arg4
+|     | |   0x000086ca      31c0           xor eax, eax
+|     | |   0x000086cc      4189c0         mov r8d, eax                ; int64_t arg5
+|     | |   0x000086cf      488dbc24a800.  lea rdi, [var_a8h]          ; int64_t arg1
+|     | |   0x000086d7      ba01000000     mov edx, 1                  ; uint32_t arg3
+|     | |   0x000086dc      e8ff180000     call sym core::fmt::Arguments::new_v1::haa4ce4ad7f317a29 ; sym.core::fmt::Arguments::new_v1::haa4ce4ad7f317a29
+|     |,==&lt; 0x000086e1      eb42           jmp 0x8725
+|     |||   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x86b8
+|     ||`-&gt; 0x000086e3      488d35ee4a04.  lea rsi, [0x0004d1d8]       ; int64_t arg2
+|     ||    0x000086ea      488d0d575903.  lea rcx, str.Incorrect..._n ; 0x3e048 ; "Incorrect...
+" ; int64_t arg4
+|     ||    0x000086f1      31c0           xor eax, eax
+|     ||    0x000086f3      4189c0         mov r8d, eax                ; int64_t arg5
+|     ||    0x000086f6      488d7c2478     lea rdi, [var_78h]          ; int64_t arg1
+|     ||    0x000086fb      ba01000000     mov edx, 1                  ; uint32_t arg3
+|     ||    0x00008700      e8db180000     call sym core::fmt::Arguments::new_v1::haa4ce4ad7f317a29 ; sym.core::fmt::Arguments::new_v1::haa4ce4ad7f317a29
+|     ||,=&lt; 0x00008705      eb00           jmp 0x8707
+|     |||   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x8705
+|     ||`-&gt; 0x00008707      488d05622201.  lea rax, [dbg._print]       ; 0x1a970 ; "UAWAVATSHì°"
+|     ||    0x0000870e      488d7c2478     lea rdi, [var_78h]
+|     ||    0x00008713      ffd0           call rax
+|     ||,=&lt; 0x00008715      eb00           jmp 0x8717
+|     |||   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x8715
+|    ,==`-&gt; 0x00008717      eb00           jmp 0x8719
+|    |||    ; CODE XREFS from src::main::hc7c3432ba867720f @ 0x8717, 0x8738
+|    `--.-&gt; 0x00008719      488d7c2430     lea rdi, [var_30h]          ; int64_t arg1
+|     ||:   0x0000871e      e85d030000     call sym core::ptr::drop_in_place&lt;alloc::string::String&gt;::h0c1c3e9775635650 ; sym.core::ptr::drop_in_place_alloc::string::String_::h0c1c3e9775635650
+|    ,====&lt; 0x00008723      eb24           jmp 0x8749
+|    |||:   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x86e1
+|    ||`--&gt; 0x00008725      488d05442201.  lea rax, [dbg._print]       ; 0x1a970 ; "UAWAVATSHì°"
+|    || :   0x0000872c      488dbc24a800.  lea rdi, [var_a8h]
+|    || :   0x00008734      ffd0           call rax
+|    ||,==&lt; 0x00008736      eb00           jmp 0x8738
+|    ||||   ; CODE XREF from src::main::hc7c3432ba867720f @ 0x8736
+|    ||``=&lt; 0x00008738      ebdf           jmp 0x8719
+     ||     ; CODE XREF from src::main::hc7c3432ba867720f @ +0x4f ; sym.src::main::hc7c3432ba867720f
+..
+|    |      ; CODE XREF from src::main::hc7c3432ba867720f @ 0x8723
+|    `----&gt; 0x00008749      4881c4e80000.  add rsp, 0xe8
+\           0x00008750      c3             ret
+    </code>
+
+    <p>
+        the real code starts at (*), when a string is allocated. this string is our pass variable which in the disassembly is called var_30h. Now, stdin is loaded into rax and rax is called.
+        We move read_line to rax, the pass variable to rdx and some other arguments. rax is called which reads a line from stdin to pass. we get the result and move it into rdi.
+        Now, trim() is called on the string. we move the result into var68_h. "p@ssw0rd" is moved into rsi and pass is moved into rdi. we compare the strings.
+        we compare eax to 1 (that means the comprasion was not successful). if it is 1, we jump to moving "Incorrect..." to rcx, some other arguments. now we call core::fmt::Arguments which formats the arguments
+        and we move that into rsi and call dbg_print (println!). otherwise we jne to exactly the same thing but moving "Correct!" to rcx.
+    </p>
+
+    <h3>Psuedocode: </h3>
+
+    <i style="display: block; white-space: pre-wrap;">
+        let pass
+
+        allocate_string(pass)
+
+        load stdin into rax
+
+        call rax
+
+        move read_line to rax
+        move pass to rdx
+
+        call rax
+
+        move the result to rdi
+
+        call trim() on pass and move that into var68_h
+
+        move "p@ssw0rd" into rdi
+
+        move the trimmed pass to rdi
+
+        if (trimmed pass == "p@ssw0rd") == 1:
+            move "Incorrect..." to rcx
+            move other args
+
+            format the arguments and move the result to rsi
+
+            call dbg_print
+        else:
+            move "Correct!" to rcx
+            move other args
+
+            format the arguments and move that to rsi
+
+            call dbg_print
+    </i>
+
+    <p>Notice that (1) Rust sometimes moves the function address into rax and then calls rax as opposed to calling the function directly
+    (2) Rust sometimes formats the arguments, moves the result to rsi and then calls the function with the formated arguments.
+    </p>
+
+    <h4>Hope you enjoyed!</h4>
+</body>

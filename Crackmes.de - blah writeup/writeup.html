@@ -1,0 +1,84 @@
+<head>
+    <title>crackmes.de - blah writeup</title>
+</head>
+
+<body>
+    <b>Let's start by disassembling the binary: </b>
+
+    <code style="display: block; white-space: pre-wrap;">
+        ;-- section..text:
+        ;-- eip:
+        / 45: entry0 ();
+        |           0x08048094      31c0           xor eax, eax                ; [01] -r-x section size 45 named .text
+        |           0x08048096      b82f000000     mov eax, 0x2f               ; '/' ; 47
+        |           0x0804809b      cd80           int 0x80
+        |           0x0804809d      3dadde0000     cmp eax, 0xdead
+        |       ,=&lt; 0x080480a2      7516           jne 0x80480ba
+        |       |   0x080480a4      b804000000     mov eax, 4
+        |       |   0x080480a9      bb01000000     mov ebx, 1
+        |       |   0x080480ae      b9c4900408     mov ecx, str.Okej__n        ; segment.LOAD1
+        |       |                                                              ; 0x80490c4 ; "Okej!\n"
+        |       |   0x080480b3      ba06000000     mov edx, 6
+        |       |   0x080480b8      cd80           int 0x80
+        |       |   ; CODE XREF from entry0 @ 0x80480a2
+        |       `-&gt; 0x080480ba      31c0           xor eax, eax
+        |           0x080480bc      40             inc eax
+        |           0x080480bd      31db           xor ebx, ebx
+        \           0x080480bf      cd80           int 0x80
+    </code>
+
+    <p style="display: block; white-space: pre-wrap;">
+    Okay, so line 1 starts by XORing eax with itself which zeroes eax. then we move 0x2f to eax and syscall. 0x2f is the getgid syscall as we can see with the strace output: 
+
+    $&gt; strace ./blah
+
+    execve("./blah", ["./blah"], 0x7ffc085e6c80 /* 37 vars */) = 0
+    [ Process PID=1276 runs in 32 bit mode. ]
+    strace: WARNING: Proper structure decoding for this personality is not supported, please consider building strace with mpers support enabled.
+    getgid()                                = 1000
+    exit(0)                                 = ?
+    +++ exited with 0 +++
+
+    after that, we compare eax which is the GID with 0xdead, 0d57005. if the comprasion was successful, we move 4 to eax (write syscall), move 1 to ebx (stdout) and move the string "Okej!\n" to ecx
+    and the length, 6 to edx. we call int 0x80 to call the write syscall. otherwise we xor eax with itself, inceremnt it by 1 and xor ebx with itself to exit. So the summarize we need to set our GID to
+    0xdead. we can do this by "groupmod -g 57005 group1". but i didn't want to really change my GID so I just changed eax in the cmp instruction :^):
+
+    Program stopped.
+    0x08048094 in ?? ()
+    (gdb) ni
+    =&gt; 0x8048094:	xor    %eax,%eax
+    (gdb) ni
+    0x08048096 in ?? ()
+    =&gt; 0x8048096:	mov    $0x2f,%eax
+    (gdb) ni
+    0x0804809b in ?? ()
+    =&gt; 0x804809b:	int    $0x80
+    (gdb) ni
+    0x0804809d in ?? ()
+    (gdb) set $eax=0xdead
+    =&gt; 0x804809d:	cmp    $0xdead,%eax
+    eax            0xdead              57005
+    ecx            0x0                 0
+    edx            0x0                 0
+    ebx            0x0                 0
+    esp            0xffffd3e0          0xffffd3e0
+    ebp            0x0                 0x0
+    esi            0x0                 0
+    edi            0x0                 0
+    eip            0x804809d           0x804809d
+    eflags         0x246               [ PF ZF IF ]
+    cs             0x23                35
+    ss             0x2b                43
+    ds             0x2b                43
+    es             0x2b                43
+    fs             0x0                 0
+    gs             0x0                 0
+    Continuing.
+
+    Okej!
+
+    [Inferior 1 (process 1296) exited normally]
+    </p>
+
+    <strong>Great! we solved it :)</strong>
+</body>

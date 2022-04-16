@@ -1,0 +1,191 @@
+<head>
+    <title>A writeup of crackmes.de easymath</title>
+</head>
+
+<body>
+    <h1>A writeup of crackmes.de easymath</h1>
+
+    <b>Let's start by disassembling with radare2: </b>
+
+    <code style="display: block; white-space: pre-wrap;">
+
+        ; DATA XREF from entry0 @ 0x8048397
+        / 212: int main (char **envp);
+        |           ; var int32_t var_24h @ ebp-0x24
+        |           ; var int32_t var_14h @ ebp-0x14
+        |           ; var int32_t var_10h @ ebp-0x10
+        |           ; var signed int var_ch @ ebp-0xc
+        |           ; var uint32_t var_8h @ ebp-0x8
+        |           ; var int32_t var_4h @ ebp-0x4
+        |           ; arg char **envp @ ebp+0xc
+        |           0x08048438      55             push ebp
+        |           0x08048439      89e5           mov ebp, esp
+        |           0x0804843b      83ec28         sub esp, 0x28
+        |           0x0804843e      83e4f0         and esp, 0xfffffff0
+        |           0x08048441      b800000000     mov eax, 0
+        |           0x08048446      83c00f         add eax, 0xf                ; 15
+        |           0x08048449      83c00f         add eax, 0xf                ; 15
+        |           0x0804844c      c1e804         shr eax, 4
+        |           0x0804844f      c1e004         shl eax, 4
+        |           0x08048452      29c4           sub esp, eax
+        |           0x08048454      8b450c         mov eax, dword [envp]
+        |           0x08048457      83c004         add eax, 4
+        |           0x0804845a      8b00           mov eax, dword [eax]
+        |           0x0804845c      85c0           test eax, eax
+        |       ,=&lt; 0x0804845e      750c           jne 0x804846c
+        |       |   0x08048460      c745dc000000.  mov dword [var_24h], 0
+        |      ,==&lt; 0x08048467      e99b000000     jmp 0x8048507
+        |      ||   ; CODE XREF from main @ 0x804845e
+        |      |`-&gt; 0x0804846c      6a00           push 0
+        |      |    0x0804846e      6a00           push 0
+        |      |    0x08048470      6a00           push 0
+        |      |    0x08048472      6a00           push 0                      ; __ptrace_request request
+        |      |   (*) 0x08048474      e8bbfeffff     call sym.imp.ptrace         ; long ptrace(__ptrace_request request, pid_t pid, void*addr, void*data)
+        |      |    0x08048479      83c410         add esp, 0x10
+        |      |    0x0804847c      83f8ff         cmp eax, 0xffffffff
+        |      |,=&lt; 0x0804847f      751d           jne 0x804849e
+        |      ||   0x08048481      e88efeffff     call sym.imp.getpid         ; int getpid(void)
+        |      ||   0x08048486      6a00           push 0
+        |      ||   0x08048488      6a00           push 0                      ; void*addr
+        |      ||   0x0804848a      50             push eax                    ; pid_t pid
+        |      ||   0x0804848b      6a11           push 0x11                   ; 17 ; __ptrace_request request
+        |      ||   0x0804848d      e8a2feffff     call sym.imp.ptrace         ; long ptrace(__ptrace_request request, pid_t pid, void*addr, void*data)
+        |      ||   0x08048492      83c410         add esp, 0x10
+        |      ||   0x08048495      c745dc000000.  mov dword [var_24h], 0
+        |     ,===&lt; 0x0804849c      eb69           jmp 0x8048507
+        |     |||   ; CODE XREF from main @ 0x804847f
+        |     (**) ||`-&gt; 0x0804849e      c745f0060000.  mov dword [var_10h], 6
+        |     ||    0x080484a5      c745f4020000.  mov dword [var_ch], 2
+        |     ||    0x080484ac      c745f8000000.  mov dword [var_8h], 0
+        |     ||    0x080484b3      c745fc304500.  mov dword [var_4h], 0x4530  ; '0E'
+        |     ||    0x080484ba      8b450c         mov eax, dword [envp]
+        |     ||    0x080484bd      83c004         add eax, 4
+        |     ||    0x080484c0      8b00           mov eax, dword [eax]
+        |     ||    0x080484c2      83ec0c         sub esp, 0xc
+        |     ||    0x080484c5      50             push eax                    ; const char *str
+        |     ||    0x080484c6      e889feffff     call sym.imp.atoi           ; int atoi(const char *str)
+        |     ||    0x080484cb      83c410         add esp, 0x10
+        |     ||    0x080484ce      8945ec         mov dword [var_14h], eax
+        |     ||    0x080484d1      90             nop
+        |     ||    0x080484d2      8b45f0         mov eax, dword [var_10h]
+        |     ||    0x080484d5      89c2           mov edx, eax
+        |     ||    0x080484d7      0faf55f4       imul edx, dword [var_ch]
+        |     ||    0x080484db      8b45ec         mov eax, dword [var_14h]
+        |     ||    0x080484de      0fafc2         imul eax, edx
+        |     ||    0x080484e1      8945f8         mov dword [var_8h], eax
+        |     ||    0x080484e4      31c0           xor eax, eax
+        |     ||    0x080484e6      8b45fc         mov eax, dword [var_4h]
+        |     ||    0x080484e9      3b45f8         cmp eax, dword [var_8h]
+        |     ||,=&lt; 0x080484ec      7510           jne 0x80484fe
+        |     |||   0x080484ee      83ec0c         sub esp, 0xc
+        |     |||   0x080484f1      6838860408     push 0x8048638              ; const char *s
+        |     |||   0x080484f6      e829feffff     call sym.imp.puts           ; int puts(const char *s)
+        |     |||   0x080484fb      83c410         add esp, 0x10
+        |     |||   ; CODE XREF from main @ 0x80484ec
+        |     ||`-&gt; 0x080484fe      31c0           xor eax, eax
+        |     ||    0x08048500      c745dc000000.  mov dword [var_24h], 0
+        |     ||    ; CODE XREFS from main @ 0x8048467, 0x804849c
+        |     ``--&gt; 0x08048507      8b45dc         mov eax, dword [var_24h]
+        |           0x0804850a      c9             leave
+        \           0x0804850b      c3             ret
+    </code>
+
+    <b>Note that the program only works if there is one argv. Otherwise it exits</b>
+
+    <p>
+    We start at (*) where ptrace is called with PTRACE_TRACEME. This essentially checks if the program is being debugged as debuggers use ptrace to attach to the process. at cmp eax, 0xffffffff
+    the return value of ptrace is compared with 0xffffffff. if the comprasion was successfull that means the program is being debugged and we continue to PTRACE_DETACHING from the process. we can easily bypass this anti-debug
+    protection by breaking at the comprasion and changing the value of eax to 0. if the comprasion was not successful we jump to (**). we call atoi on argv[1]. we move the result to var_14h.
+    now, we move var_10h to eax and move eax to edx. we multiply edx by var_ch. we move var_14h to eax and multiply eax by edx. we move eax to var_8h and set eax to zero by XORing it with itself.
+    now we move var_4h to eax and compare var_8h to eax. if the comprasion was successful we continue into printing a success message and otherwise we exit.
+    </p>
+
+    <p>
+    Let's trace with strace to see if our analysis was correct:
+    </p>
+
+    <code style="display: block; white-space: pre-wrap;">
+        [snip]        
+
+        ptrace(PTRACE_TRACEME)                  = -1 EPERM (Operation not permitted)
+        getpid()                                = 12200
+        ptrace(PTRACE_DETACH, 12200, NULL, 0)   = -1 ESRCH (No such process)
+        exit_group(0)                           = ?
+        +++ exited with 0 +++
+    </code>
+
+    <p>
+    Great! our analysis was correct. now lets try to find the values in all of the vars. first we will find the function addresses with r2 as this binary has no section headers: 
+    </p>
+
+    <code style="display: block; white-space: pre-wrap;">
+        [0x08048380]&gt; aaa
+        [0x08048380]&gt; afl
+        0x08048380    1 34           entry0
+        0x08048344    1 6            sym.imp.__libc_start_main
+        0x08048314    1 6            sym.imp.getpid
+        0x08048324    1 6            sym.imp.puts
+        0x08048334    1 6            sym.imp.ptrace
+        0x08048354    1 6            sym.imp.atoi
+        0x08048438    8 212          main
+        0x080485e0    4 49           fcn.080485e0
+        0x080483ae    3 26           fcn.080483ae
+        0x08048364    1 6            loc.imp.__gmon_start__
+        0x0804851e    5 85   -&gt; 77   fcn.0804851e
+        0x080482ec    1 23           fcn.080482ec
+        0x080483a4    1 10           fcn.080483a4
+        0x08048410    4 39           fcn.08048410
+        0x0804858e    4 74           fcn.0804858e
+        0x08048614    1 26           fcn.08048614
+        0x080483d0    6 62   -&gt; 47   fcn.080483d0
+        [0x08048380]&gt; q
+    </code>
+
+    <p>
+        So the sym.imp.__libc_start_main address is at 0x08048344. we will break there and then step into main to not miss anything: 
+    </p>
+
+    <code style="display: block; white-space: pre-wrap;">
+        I couldn't include the gdb output because it was too long. sorry :)
+    </code>
+
+    <p>
+        As we can see, 
+        var_10h = 0x6
+        var_ch = 0x2
+        var_8h = 0
+        var_4h = 0x4530
+
+        var_ch = 0x2 is moved into eax
+        0x4 is add to eax. eax is now 0x6
+        we call 0x08048354:
+
+        we move var_14h = 0x7b (argv[1]) to eax
+        we move var_10h to eax. eax=6
+        we move eax to edx. edx=6
+        we multiply edx by var_ch and store the result in edx. edx=6 * 2=12
+        we move var_14h to eax. eax=0x7b=argv[1]=123
+        we multiply edx by eax and store the result in eax. eax=12*123=1476
+        we move eax to var_8h. var_8h=1476
+        we zero eax
+        we move var_4h to eax
+        we compare var_8h=12 * argv[1] to var_8h=17712
+    </p>
+
+    <p>
+        To summarize, we need argv[1]=x such that 12x=17712
+        Solving for x:
+
+        12x = 17712 /:12
+        x = 1476
+    </p>
+
+    <p>
+        So argv[1] needs to be 1476. let's try that: 
+
+        $&gt; ./easymath 1476
+        done
+
+        Great!! we solved the challenge.
+    </p>
+</body>

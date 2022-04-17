@@ -1,0 +1,48 @@
+<head>
+    <title>pwnable.kr - fd</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    Here is the source code: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+        #include &lt;stdlib.h&gt;
+        #include &lt;string.h&gt;
+        char buf[32];
+        int main(int argc, char* argv[], char* envp[]){
+        if(argc&lt;2){
+          printf("pass argv[1] a number\n");
+          return 0;
+          }
+          int fd = atoi( argv[1] ) - 0x1234;
+          int len = 0;
+          len = read(fd, buf, 32);
+          if(!strcmp("LETMEWIN\n", buf)){
+          printf("good job :)\n");
+          system("/bin/cat flag");
+          exit(0);
+          }
+          printf("learn about Linux file IO\n");
+          return 0;
+
+          }
+    </code>
+
+    So what this does is compare the number of arguments to 2, if it isn't, the program exits.
+    the fd variable is equal to argv[1] - 0x1234 and len is equal to the length of the input of the user which is stored in buf.
+    we compare buf to "LETMEWIN\n" and if its is, we win and otherwise we lose. The only catch is that the program reads from the argv[1] fd. so we need to set it to 0 which is stdin. we can solve for x:
+    0 = argv[1] - 0x1234
+    argv[1] = 0x1234 = 4660
+
+    So argv[1] needs to be 4660. Let's try that: 
+    fd@pwnable:~$ ./fd 4660
+    LETMEWIN
+    good job :)
+    ***********************************
+
+    We finished the challenge!
+    </p>
+</body>
+

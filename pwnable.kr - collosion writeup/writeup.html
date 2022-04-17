@@ -1,0 +1,74 @@
+<head>
+    <title>pwnable.kr - collision writeup</title>
+</head>
+
+<body>
+    <b style="display: block; white-space: pre-wrap;">
+        Let's start by looking at the source code:
+    </b>
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+        #include &lt;string.h&gt;
+        unsigned long hashcode = 0x21DD09EC;
+        unsigned long check_password(const char* p){
+        int* ip = (int*)p;
+        int i;
+        int res=0;
+        for(i=0; i&lt;5; i++){
+        res += ip[i];
+        }
+        return res;
+        }
+
+        int main(int argc, char* argv[]){
+        if(argc&lt;2){
+        printf("usage : %s [passcode]\n", argv[0]);
+        return 0;
+        }
+        if(strlen(argv[1]) != 20){
+        printf("passcode length should be 20 bytes\n");
+        return 0;
+        }
+
+        if(hashcode == check_password( argv[1] )){
+        system("/bin/cat flag");
+        return 0;
+        }
+        else
+        printf("wrong passcode.\n");
+        return 0;
+        }
+    </code>
+
+    <p style="display: block; white-space: pre-wrap;">
+        So, we need to input one argument with length 20. Now, we need check_password(argv[1]) to be equal to hashcode, which is 0x21dd09ec = 0d568134124. the check_password function sums the ascii values
+        of the characters in our password, so for example if we enter AAAAAAAAAAAAAAAAAAAA, The program will divide that into 5 four byte blocks, and sum them which will give us
+        0x41414141 + 0x41414141 + 0x41414141 + 0x41414141 + 0x41414141 = 5473977925
+        
+        So we need to find a block, that when divided into 5 blocks and summed will give us 0x21dd09ec. i think a nice way to do that is set the other 4 blocks to some constant value and then solve for
+        the fifth block. I used a python script for that:
+        
+        <code style="display: block; white-space: pre-wrap;">
+            const_block = 0x05050505
+            const_block_sum = 4 * const_value
+            target_val = 0x21DD09EC
+
+            fifth_block = target_val - const_value
+            print(hex(fifth_block))
+        </code>
+
+        $&gt; python solver.py
+        0x0dc8f5d8
+
+        So to solve, we will need to enter the following command on the ssh: 
+        col@pwnable:~$ ./col  $(python2 -c 'print "\x05\x05\x05\x05" + "\x05\x05\x05\x05" + "\x05\x05\x05\x05" + "\x05\x05\x05\x05" + "\xd8\xf5\xc8\x0d"')
+        ******************************
+    </p>
+
+    <strong style="display: block; white-space: pre-wrap;">
+        Great! we solved it
+    </strong>
+</body>
+
+

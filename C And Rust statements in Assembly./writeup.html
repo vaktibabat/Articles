@@ -1,0 +1,782 @@
+<head>
+    <title>C And Rust statements in assembly</title>
+</head>
+
+<body>
+    <b style="display: block; white-space: pre-wrap;">
+        The goal of this article is to show C And Rust statements (if, for, ...) in assembly language. this is very important in reverse engineering.
+    </b>
+
+    <i style="display: block; white-space: pre-wrap;">
+        The if statement: 
+    </i>
+
+    <p style="display: block; white-space: pre-wrap;">
+    The if statement works like this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        if (condition is true)
+        {
+        statement
+        }
+    </code>
+
+    So an example for an if statement in C is: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        int main(int argc, char **argv)
+        {
+        int apples;
+        int bananas;
+
+        printf("Enter amount of apples: ");
+        scanf("%d", &amp;apples);
+
+        printf("\nEnter amount of bananas: ");
+        scanf("%d", &amp;bananas);
+
+        if (apples &gt; bananas)
+        {
+        printf("You have more apples than bananas.\n");
+        }
+        else
+        {
+        printf("You have more bananas than apples.\n");
+        }
+        }
+    </code>
+
+    This program initializes two variables, apples and bananas. it prints Some messages and scans input into the variables. IF the amount of apples is larger than the amount of bananas, we print message1
+    and ELSE we print message2. Let's look at this program in assembly: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        [snip]
+        0x000011e5      8b55f0        mov edx, apples
+        |           0x000011e8      8b45f4         mov eax, bananas
+        |           0x000011eb      39c2           cmp edx, eax
+        |       ,=&lt; 0x000011ed      7e11           jle 0x1200
+        |       |   0x000011ef      488d054a0e00.  lea rax, str.You_have_more_apples_than_bananas. ; 0x2040 ; "You have more apples than bananas."
+        |       |   0x000011f6      4889c7         mov rdi, rax                ; const char *s
+        |       |   0x000011f9      e832feffff     call sym.imp.puts           ; int puts(const char *s)
+        |      ,==&lt; 0x000011fe      eb0f           jmp 0x120f
+        |      ||   ; CODE XREF from main @ 0x11ed
+        |      |`-&gt; 0x00001200      488d05610e00.  lea rax, str.You_have_more_bananas_than_apples. ; 0x2068 ; "You have more bananas than apples."
+        |      |    0x00001207      4889c7         mov rdi, rax                ; const char *s
+        |      |    0x0000120a      e821feffff     call sym.imp.puts           ; int puts(const char *s)
+        |      |    ; CODE XREF from main @ 0x11fe
+        |      `--&gt; 0x0000120f      b800000000     mov eax, 0
+        [snip]
+    </code>
+
+    (I changed the names a bit). So we move the apples variable into edx and the bananas variable into eax. we compare edx and eax and call jle (Jump if Less than or Equal to).
+    If edx &lt;= eax, apples &lt;= bananas So we jump into printing "You have more bananas than apples". Otherwise, we don't jump into some other part but we just continue execution to printing "You have more apples than bananas."
+
+    <b style="display: block; white-space: pre-wrap;">
+        Here's the same program in rust: 
+    </b>
+
+    <code style="display: block; white-space: pre-wrap;">
+        use std::io::Write;
+
+        fn main() {
+        let mut apples = String::new();
+        let mut bananas = String::new();
+
+        let mut apples_amount = 0;
+        let mut bananas_amount = 0;
+
+        println!("Enter the amount of apples: ");
+        std::io::stdin().read_line(&amp;mut apples).expect("Error while reading.");
+
+        std::io::stdout().flush().expect("Error while flushing.");
+
+        println!("Enter the amount of bananas: ");
+        std::io::stdin().read_line(&amp;mut bananas).expect("Error while reading.");
+
+        match apples.trim().parse::&lt;u8&gt;() {
+        Ok(o) =&gt; {
+        apples_amount = o;
+        }
+        Err(_) =&gt; {
+        println!("Error while parsing.");
+        }
+        }
+
+        match bananas.trim().parse::<u8>() {
+        Ok(o) =&gt; {
+        bananas_amount = o;
+        }
+        Err(_) =&gt; {
+        println!("Error while parsing.");
+        }
+        }
+
+        if apples_amount &gt; bananas_amount {
+        println!("You have more apples than bananas.");
+        }
+        else {
+        println!("You have more bananas than apples.");
+        }
+        }                  
+    </code>
+
+    I will admit this code is a bit different than the C code, as I had to include some error handling because the Rust compiler is strict (Which is a good thing!). Other than that, Those programs are very simillar.
+
+    Here's the assembly: 
+
+    <code style="display: block; white-space: pre-wrap">
+        [snip]
+        |    |  |   0x00009aa6      488d0dbb5503.  lea rcx, str.Error_while_reading.ifRust.rsError_while_flushing.Enter_the_amount_of_bananas:__nError_while_parsing._nYou_have_more_apples_than_bananas._nYou_have_more_bananas_than_apples._ninvalid_args_rustc_1.59.0_library_core_src_fmt_mod.rs ; 0x3f068 ; &quot;Error while reading.ifRust.rsError while flushing.Enter the amount of bananas: 
+        Error while parsing.
+        You have more apples than bananas.
+        You have more bananas than apples.
+        invalid args/rustc/1.59.0/library/core/src/fmt/mod.rs&quot; ; int64_t arg4
+        |    |  |   (**) 0x00009aad      31c0           xor eax, eax
+        |    |  |   0x00009aaf      4189c0         mov r8d, eax                ; int64_t arg5
+        |    |  |   0x00009ab2      488dbc247001.  lea rdi, [var_170h]         ; int64_t arg1
+        |    |  |   0x00009aba      ba01000000     mov edx, 1                  ; uint32_t arg3
+        |    |  |   0x00009abf      e8ac070000     call sym core::fmt::Arguments::new_v1::h08f46f2f0ead0aae ; sym.core::fmt::Arguments::new_v1::h08f46f2f0ead0aae
+        |    | ,==&lt; 0x00009ac4      eb00           jmp 0x9ac6
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9ac4
+        |    | `--&gt; 0x00009ac6      488d05431201.  lea rax, [dbg._print]       ; 0x1ad10 ; &quot;UAWAVATSHì°&quot;
+        |    |  |   0x00009acd      488dbc247001.  lea rdi, [var_170h]
+        |    |  |   0x00009ad5      ffd0           call rax
+        |    | ,==&lt; 0x00009ad7      eb00           jmp 0x9ad9
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9ad7
+        |    |,`--&gt; 0x00009ad9      eb00           jmp 0x9adb
+        |    || |   ; CODE XREFS from ifRust::main::heb3231295f0e15ba @ 0x9a9d, 0x9ad9
+        |    |`-`-&gt; 0x00009adb      488dbc249000.  lea rdi, [var_90h]          ; int64_t arg1
+        |    |      0x00009ae3      e868f4ffff     call sym &lt;alloc::string::String as core::ops::deref::Deref&gt;::deref::ha865a89fee2cde7d ; sym._alloc::string::String_as_core::ops::deref::Deref_::deref::ha865a89fee2cde7d
+        |    |      0x00009ae8      4889542418     mov qword [var_18h], rdx
+        |    |      0x00009aed      4889442420     mov qword [var_20h], rax
+        |    |  ,=&lt; 0x00009af2      eb00           jmp 0x9af4
+        |    |  |   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9af2
+        |    |  `-&gt; 0x00009af4      488b742418     mov rsi, qword [var_18h]    ; int64_t arg2
+        |    |      0x00009af9      488b7c2420     mov rdi, qword [var_20h]    ; int64_t arg1
+        |    |      0x00009afe      e87df8ffff     call sym core::str::_&lt;impl str&gt;::trim::h34beec7eaec0f210 ; sym.core::str::__impl_str_::trim::h34beec7eaec0f210
+        |    |      0x00009b03      4889542408     mov qword [var_8h], rdx
+        |    |      0x00009b08      4889442410     mov qword [var_10h], rax
+        |    |  ,=&lt; 0x00009b0d      eb00           jmp 0x9b0f
+        |    |  |   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9b0d
+        |    |  `-&gt; 0x00009b0f      488b742408     mov rsi, qword [var_8h]
+        |    |      0x00009b14      488b7c2410     mov rdi, qword [var_10h]
+        |    |      0x00009b19      e8c2f9ffff     call sym core::str::_&lt;impl str&gt;::parse::hd3ee80b273ddcda7 ; sym.core::str::__impl_str_::parse::hd3ee80b273ddcda7
+        |    |      0x00009b1e      88542406       mov byte [var_6h], dl
+        |    |      0x00009b22      88442407       mov byte [var_7h], al
+        |    |  ,=&lt; 0x00009b26      eb00           jmp 0x9b28
+        |    |  |   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9b26
+        |    |  `-&gt; 0x00009b28      8a442406       mov al, byte [var_6h]
+        |    |      0x00009b2c      8a4c2407       mov cl, byte [var_7h]
+        |    |      0x00009b30      888c24a00100.  mov byte [var_1a0h], cl
+        |    |      0x00009b37      888424a10100.  mov byte [var_1a1h], al
+        |    |      0x00009b3e      0fb68424a001.  movzx eax, byte [var_1a0h]
+        |    |      0x00009b46      a801           test al, 1
+        |    |  ,=&lt; 0x00009b48      7406           je 0x9b50
+        |    | ,==&lt; 0x00009b4a      eb00           jmp 0x9b4c
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9b4a
+        |    |,`--&gt; 0x00009b4c      eb12           jmp 0x9b60
+        ..
+        |    || |   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9b48
+        |    || `-&gt; 0x00009b50      8a8424a10100.  mov al, byte [var_1a1h]
+        |    ||     0x00009b57      888424af0000.  mov byte [var_afh], al
+        |    || ,=&lt; 0x00009b5e      eb3c           jmp 0x9b9c
+        |    || |   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9b4c
+        |    |`---&gt; 0x00009b60      488d35794604.  lea rsi, [0x0004e1e0]       ; int64_t arg2
+        |    |  |   0x00009b67      488d0dfa5403.  lea rcx, str.Error_while_reading.ifRust.rsError_while_flushing.Enter_the_amount_of_bananas:__nError_while_parsing._nYou_have_more_apples_than_bananas._nYou_have_more_bananas_than_apples._ninvalid_args_rustc_1.59.0_library_core_src_fmt_mod.rs ; 0x3f068 ; &quot;Error while reading.ifRust.rsError while flushing.Enter the amount of bananas: 
+        Error while parsing.
+        You have more apples than bananas.
+        You have more bananas than apples.
+        invalid args/rustc/1.59.0/library/core/src/fmt/mod.rs&quot; ; int64_t arg4
+        |    |  |   0x00009b6e      31c0           xor eax, eax
+        |    |  |   0x00009b70      4189c0         mov r8d, eax                ; int64_t arg5
+        |    |  |   0x00009b73      488dbc24a801.  lea rdi, [var_1a8h]         ; int64_t arg1
+        |    |  |   0x00009b7b      ba01000000     mov edx, 1                  ; uint32_t arg3
+        |    |  |   0x00009b80      e8eb060000     call sym core::fmt::Arguments::new_v1::h08f46f2f0ead0aae ; sym.core::fmt::Arguments::new_v1::h08f46f2f0ead0aae
+        |    | ,==&lt; 0x00009b85      eb00           jmp 0x9b87
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9b85
+        |    | `--&gt; 0x00009b87      488d05821101.  lea rax, [dbg._print]       ; 0x1ad10 ; &quot;UAWAVATSHì°&quot;
+        |    |  |   0x00009b8e      488dbc24a801.  lea rdi, [var_1a8h]
+        |    |  |   0x00009b96      ffd0           call rax
+        |    | ,==&lt; 0x00009b98      eb00           jmp 0x9b9a
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9b98
+        |    |,`--&gt; 0x00009b9a      eb00           jmp 0x9b9c
+        |    || |   ; CODE XREFS from ifRust::main::heb3231295f0e15ba @ 0x9b5e, 0x9b9a
+        |    |`-`-&gt; (***) 0x00009b9c      8a8424ae0000.  mov al, byte [var_aeh]
+        |    |      0x00009ba3      3a8424af0000.  cmp al, byte [var_afh]
+        |    |  ,=&lt; 0x00009baa      7727           ja 0x9bd3
+        |    |  |   0x00009bac      488d354d4604.  lea rsi, [0x0004e200]       ; int64_t arg2
+        |    |  |   0x00009bb3      488d0dae5403.  lea rcx, str.Error_while_reading.ifRust.rsError_while_flushing.Enter_the_amount_of_bananas:__nError_while_parsing._nYou_have_more_apples_than_bananas._nYou_have_more_bananas_than_apples._ninvalid_args_rustc_1.59.0_library_core_src_fmt_mod.rs ; 0x3f068 ; &quot;Error while reading.ifRust.rsError while flushing.Enter the amount of bananas: 
+        Error while parsing.
+        You have more apples than bananas.
+        You have more bananas than apples.
+        invalid args/rustc/1.59.0/library/core/src/fmt/mod.rs&quot; ; int64_t arg4
+        |    |  |   0x00009bba      31c0           xor eax, eax
+        |    |  |   0x00009bbc      4189c0         mov r8d, eax                ; int64_t arg5
+        |    |  |   0x00009bbf      488dbc240802.  lea rdi, [var_208h]         ; int64_t arg1
+        |    |  |   0x00009bc7      ba01000000     mov edx, 1                  ; uint32_t arg3
+        |    |  |   0x00009bcc      e89f060000     call sym core::fmt::Arguments::new_v1::h08f46f2f0ead0aae ; sym.core::fmt::Arguments::new_v1::h08f46f2f0ead0aae
+        |    | ,==&lt; 0x00009bd1      eb4b           jmp 0x9c1e
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9baa
+        |    | |`-&gt; 0x00009bd3      488d35164604.  lea rsi, [0x0004e1f0]       ; int64_t arg2
+        |    | |    0x00009bda      488d0d875403.  lea rcx, str.Error_while_reading.ifRust.rsError_while_flushing.Enter_the_amount_of_bananas:__nError_while_parsing._nYou_have_more_apples_than_bananas._nYou_have_more_bananas_than_apples._ninvalid_args_rustc_1.59.0_library_core_src_fmt_mod.rs ; 0x3f068 ; &quot;Error while reading.ifRust.rsError while flushing.Enter the amount of bananas: 
+        Error while parsing.
+        You have more apples than bananas.
+        You have more bananas than apples.
+        invalid args/rustc/1.59.0/library/core/src/fmt/mod.rs&quot; ; int64_t arg4
+        |    | |    0x00009be1      31c0           xor eax, eax
+        |    | |    0x00009be3      4189c0         mov r8d, eax                ; int64_t arg5
+        |    | |    0x00009be6      488dbc24d801.  lea rdi, [var_1d8h]         ; int64_t arg1
+        |    | |    0x00009bee      ba01000000     mov edx, 1                  ; uint32_t arg3
+        |    | |    0x00009bf3      e878060000     call sym core::fmt::Arguments::new_v1::h08f46f2f0ead0aae ; sym.core::fmt::Arguments::new_v1::h08f46f2f0ead0aae
+        |    | |,=&lt; 0x00009bf8      eb00           jmp 0x9bfa
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9bf8
+        |    | |`-&gt; 0x00009bfa      488d050f1101.  lea rax, [dbg._print]       ; 0x1ad10 ; &quot;UAWAVATSHì°&quot;
+        |    | |    0x00009c01      488dbc24d801.  lea rdi, [var_1d8h]
+        |    | |    0x00009c09      ffd0           call rax
+        |    | |,=&lt; 0x00009c0b      eb00           jmp 0x9c0d
+        |    | ||   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9c0b
+        |    |,=`-&gt; 0x00009c0d      eb00           jmp 0x9c0f
+        |    |||    ; CODE XREFS from ifRust::main::heb3231295f0e15ba @ 0x9c0d, 0x9c31
+        |    |`-.-&gt; 0x00009c0f      488dbc249000.  lea rdi, [var_90h]          ; int64_t arg1
+        |    | |:   0x00009c17      e834efffff     call sym core::ptr::drop_in_place&lt;alloc::string::String&gt;::h35485e4d7380c9e3 ; sym.core::ptr::drop_in_place_alloc::string::String_::h35485e4d7380c9e3
+        |    |,===&lt; 0x00009c1c      eb15           jmp 0x9c33
+        |    |||:   ; CODE XREF from ifRust::main::heb3231295f0e15ba @ 0x9bd1
+        |    ||`--&gt; 0x00009c1e      488d05eb1001.  lea rax, [dbg._print]       ; 0x1ad10 ; &quot;UAWAVATSHì°&quot;
+        |    || :   0x00009c25      488dbc240802.  lea rdi, [var_208h]
+        |    || :   0x00009c2d      ffd0           call rax
+            [snip]
+    </code>
+
+    So, we start by trimming the apples string to later parse it at (*). At (**) is the Error branch of the match statement which we use to check if there was an error while parsing. Before that we load the number of apples into var_ae.
+    same thing with bananas but this time we load the number of bananas into var_af. Notice (***) where we move the apples into al, and compare it to the bananas. we ja (Jump Above) into printing
+    "You have more apples than bananas". Otherwise, we continue into printing "You have more bananas than apples.".
+
+    <i style="display: block; white-space: pre-wrap;">
+        The while Loop
+    </i>
+
+    The while loop works like this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        while (condition is true)
+        {
+            do something;
+        }
+    </code>
+
+    So an example in a C program is:
+
+    <code style="display: block; white-space: pre-wrap;">
+        int main(int argc, char **argv)
+        {
+            int apples;
+            
+            printf("How many apples do you have? ");
+            scanf("%d", &amp;apples);
+
+            while (apples &gt; 0)
+            {
+                apples -= 1;
+                
+                printf("[I ate an apple]\n");
+                printf("You now have %d apples\n", apples);
+            }
+        }
+    </code>
+
+    This program asks the user to enter the amount of apples they have, and then enters a while loop. WHILE the number of apples is more than 0, decrease the number of apples and print the number of apples.
+
+    Here is this program in assembly:
+
+    <code style="display: block; white-space: pre-wrap;">
+                    ; DATA XREF from entry0 @ 0x1088
+/ 162: int main (int argc, char **argv);
+|           ; var char **var_20h @ rbp-0x20
+|           ; var int64_t var_14h @ rbp-0x14
+|           ; var int64_t var_ch @ rbp-0xc
+|           ; var int64_t var_8h @ rbp-0x8
+|           ; arg int argc @ rdi
+|           ; arg char **argv @ rsi
+        [snip]
+|       ,=&lt; 0x000011b6      eb31           jmp 0x11e9
+|       |   ; CODE XREF from main @ 0x11ee
+|      .--&gt; 0x000011b8      8b45f4         mov eax, dword [var_ch]
+|      :|   0x000011bb      83e801         sub eax, 1
+|      :|   0x000011be      8945f4         mov dword [var_ch], eax
+|      :|   0x000011c1      488d055d0e00.  lea rax, str._I_ate_an_apple_ ; 0x2025 ; "[I ate an apple]"
+|      :|   0x000011c8      4889c7         mov rdi, rax                ; const char *s
+|      :|   0x000011cb      e860feffff     call sym.imp.puts           ; int puts(const char *s)
+|      :|   0x000011d0      8b45f4         mov eax, dword [var_ch]
+|      :|   0x000011d3      89c6           mov esi, eax
+|      :|   0x000011d5      488d055a0e00.  lea rax, str.You_now_have__d_apples_n ; 0x2036 ; "You now have %d apples\n"
+|      :|   0x000011dc      4889c7         mov rdi, rax                ; const char *format
+|      :|   0x000011df      b800000000     mov eax, 0
+|      :|   0x000011e4      e867feffff     call sym.imp.printf         ; int printf(const char *format)
+|      :|   ; CODE XREF from main @ 0x11b6
+|      :`-&gt; 0x000011e9      8b45f4         mov eax, dword [var_ch]
+|      :    0x000011ec      85c0           test eax, eax
+|      `==&lt; 0x000011ee      7fc8           jg 0x11b8
+        [snip]
+    </code>
+
+    Okay, so we start by jumping into moving the number of apples into eax, testing eax with eax (this checks if eax = apples = 0) and then jging (Jump if greater) into the body. so what this does is just check if
+    eax &gt; 0. let's try to run through this while eax is 0: test eax, eax (true) so we don't jg and we continue into exiting from the program.
+    
+    <b style="display: block; white-space: pre-wrap;">
+        Here's the same program in Rust: 
+    </b>
+
+    <code style="display: block; white-space: pre-wrap;">
+fn main() {
+    let mut apples = String::new();
+    let mut number_of_apples = 0;
+
+    println!("How many apples do you have? ");
+    std::io::stdin().read_line(&amp;mut apples).expect("Error while reading.");
+
+    match apples.trim().parse::&lt;u8&gt;() {
+        Ok(o) =&gt; {
+            number_of_apples = o;
+        }
+        Err(_) =&gt; {
+            panic!("Error while parsing.");
+        }
+    }
+
+    while number_of_apples &gt; 0 {
+        number_of_apples = number_of_apples - 1;
+
+        println!("[I ate an apple]");
+        println!("You now have: {} apples", number_of_apples);
+    }
+}
+    </code>
+
+    Like the if program, this also has error handling and trimming and parsing but other than that it's the same. Let's look at the assembly:
+
+    <code style="display: block; white-space: pre-wrap;">
+        
+[snip]
+(*)|    || `-&gt; 0x0000a640      8a8424b90000.  mov al, byte [var_b9h]
+|    ||     0x0000a647      88442467       mov byte [var_67h], al
+|    || ,=&lt; 0x0000a64b      eb1c           jmp 0xa669
+|    || |   ; CODE XREF from whileRust::main::h5f2179c7d41edd52 @ 0xa63c
+|    `----&gt; 0x0000a64d      488d3d444a03.  lea rdi, [0x0003f098]       ; &quot;Error while parsing.&quot; ; int64_t arg1
+|     | |   0x0000a654      488d15453b04.  lea rdx, [0x0004e1a0]       ; int64_t arg3
+|     | |   0x0000a65b      be14000000     mov esi, 0x14               ; int64_t arg2
+|     | |   0x0000a660      e83be9ffff     call sym std::panicking::begin_panic::hc862c557cdc35425 ; sym.std::panicking::begin_panic::hc862c557cdc35425
+|     |,==&lt; 0x0000a665      eb00           jmp 0xa667
+|     |||   ; CODE XREFS from whileRust::main::h5f2179c7d41edd52 @ 0xa665, 0xa6db
+|    .-`--&gt; 0x0000a667      0f0b           ud2
+|    :| |   ; CODE XREFS from whileRust::main::h5f2179c7d41edd52 @ 0xa64b, 0xa773
+|   (**) :|.`-&gt; 0x0000a669      807c246700     cmp byte [var_67h], 0
+|    :|:,=&lt; 0x0000a66e      770f           ja 0xa67f
+|    :|:|   0x0000a670      488d7c2448     lea rdi, [var_48h]          ; int64_t arg1
+|    :|:|   0x0000a675      e8f6f7ffff     call sym core::ptr::drop_in_place&lt;alloc::string::String&gt;::h5239667d39eeb4cf ; sym.core::ptr::drop_in_place_alloc::string::String_::h5239667d39eeb4cf
+|   ,=====&lt; 0x0000a67a      e908010000     jmp 0xa787
+|   |:|:|   ; CODE XREF from whileRust::main::h5f2179c7d41edd52 @ 0xa66e
+|   |:|:`-&gt; 0x0000a67f      8a442467       mov al, byte [var_67h]
+|   |:|:    0x0000a683      2c01           sub al, 1
+|   |:|:    0x0000a685      8844241d       mov byte [var_1dh], al
+|   |:|:    0x0000a689      0f92c0         setb al
+|   |:|:    0x0000a68c      a801           test al, 1
+|   |:|:,=&lt; 0x0000a68e      752f           jne 0xa6bf
+|   |:|:|   0x0000a690      8a44241d       mov al, byte [var_1dh]
+|   |:|:|   0x0000a694      88442467       mov byte [var_67h], al
+|   |:|:|   0x0000a698      488d35313b04.  lea rsi, [0x0004e1d0]       ; int64_t arg2
+|   |:|:|   0x0000a69f      488d0dd24903.  lea rcx, str.Error_while_reading.whileRust.rsError_while_parsing. ; 0x3f078 ; &quot;Error while reading.whileRust.rsError while parsing.&quot; ; int64_t arg4
+|   |:|:|   0x0000a6a6      31c0           xor eax, eax
+|   |:|:|   0x0000a6a8      4189c0         mov r8d, eax                ; int64_t arg5
+|   |:|:|   0x0000a6ab      488dbc24c000.  lea rdi, [var_c0h]          ; int64_t arg1
+|   |:|:|   0x0000a6b3      ba01000000     mov edx, 1                  ; uint32_t arg3
+|   |:|:|   0x0000a6b8      e8e3060000     call sym core::fmt::Arguments::new_v1::h8ddc56b9b859d8af ; sym.core::fmt::Arguments::new_v1::h8ddc56b9b859d8af
+|  ,======&lt; 0x0000a6bd      eb1e           jmp 0xa6dd
+|  ||:|:|   ; CODE XREF from whileRust::main::h5f2179c7d41edd52 @ 0xa68e
+|  ||:|:`-&gt; 0x0000a6bf      488d3dea4903.  lea rdi, obj.str.0_1        ; 0x3f0b0 ; &quot;attempt to subtract with overflow[I ate an apple]
+You now have:  apples
+invalid args/rustc/1.59.0/library/core/src/fmt/mod.rs&quot;
+|  ||:|:    0x0000a6c6      488d15eb3a04.  lea rdx, [0x0004e1b8]                                           DH	D$HÇD$ &quot;
+|  ||:|:    0x0000a6d4      be21000000     mov esi, 0x21               ; &#x27;!&#x27;t;HìHH	|H	t$H
+|  ||:|:    0x0000a6d9      ffd0           call rax
+|  ||`====&lt; 0x0000a6db      eb8a           jmp 0xa667
+|  || |:    ; CODE XREF from whileRust::main::h5f2179c7d41edd52 @ 0xa6bd
+|  `------&gt; 0x0000a6dd      488d056c1001.  lea rax, [dbg._print]       ; 0x1b750 ; &quot;UAWAVATSHì°&quot;
+|   | |:    0x0000a6e4      488dbc24c000.  lea rdi, [var_c0h]
+|   | |:    0x0000a6ec      ffd0           call rax
+|   | |:,=&lt; 0x0000a6ee      eb00           jmp 0xa6f0
+|   | |:|   ; CODE XREF from whileRust::main::h5f2179c7d41edd52 @ 0xa6ee
+|   | |:`-&gt; 0x0000a6f0      488d442467     lea rax, [var_67h]
+|   | |:    0x0000a6f5      488984243001.  mov qword [var_130h], rax
+§P&quot; ; int64_t arg2     488bbc243001.  mov rdi, qword [var_130h]   ; int64_t arg1                                                                                   ÑÁê
+|   | |:    0x0000a70c      e83f060000     call sym core::fmt::ArgumentV1::new::h7f7a2c9475f7f62a ; sym.core::fmt::ArgumentV1::new::h7f7a2c9475f7f62a&quot;Hì(¶Høcv-¶ȍ	   kÊd(È¶ÀH
+|   | |:    0x0000a711      4889542408     mov qword [var_8h], rdx
+|   | |:    0x0000a716      4889442410     mov qword [var_10h], rax
+|   | |:,=&lt; 0x0000a71b      eb00           jmp 0xa71d
+|   | |:|   ; CODE XREF from whileRust::main::h5f2179c7d41edd52 @ 0xa71b
+|   | |:`-&gt; 0x0000a71d      488b442408     mov rax, qword [var_8h]
+|   | |:    0x0000a722      488b4c2410     mov rcx, qword [var_10h]
+|   | |:    0x0000a727      48898c242001.  mov qword [var_120h], rcx
+|   | |:    0x0000a72f      488984242801.  mov qword [var_128h], rax
+|   | |:    0x0000a737      488d35a23a04.  lea rsi, str.t_fY_a_f       ; 0x43aa2 ; &quot;t
+    [snip]
+    </code>
+
+    So we start with the parsing match statement. Same as the if program, on error we panic and if there wasn't an error we move the parsed data into var_67h. At (**) we do the same thing as the C program.
+    We compare the number of apples to 0 (Equivilent to doing test var_67h, var_67h) and ja into the body of the while loop
+
+    <b style="display: block; white-space: pre-wrap;">
+        Anecdote: the do-while loop in C
+    </b>
+
+    The do-while loop works like this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        do
+        {
+            something
+        } while (condition is true)
+    </code>
+
+    So basically the only difference is that the body gets executed once regardless of the condition being true.
+
+    Here is an example of a C program:
+
+
+    <code style="display: block; white-space: pre-wrap;">
+        int main(int argc, char **argv)
+        {
+            int secondsToLaunch = 10;
+
+            do
+            {
+                secondsToLaunch -= 1;
+                printf("Launching in %d\n", secondsToLaunch);
+            } while (secondsToLaunch &gt; 0);
+        }
+    </code>
+
+    And here's the assembly for that:
+
+    <code style="display: block; white-space: pre-wrap;">
+            [snip]
+        |       .-&gt; 0x0000114f      836dfc01       sub dword [var_4h], 1
+|       :   0x00001153      8b45fc         mov eax, dword [var_4h]
+|       :   0x00001156      89c6           mov esi, eax
+|       :   0x00001158      488d05a50e00.  lea rax, str.Launching_in__d_n ; 0x2004 ; "Launching in %d\n"
+|       :   0x0000115f      4889c7         mov rdi, rax                ; const char *format
+|       :   0x00001162      b800000000     mov eax, 0
+|       :   0x00001167      e8c4feffff     call sym.imp.printf         ; int printf(const char *format)
+|       :   0x0000116c      837dfc00       cmp dword [var_4h], 0
+|       `=&lt; 0x00001170      7fdd           jg 0x114f
+        [snip]
+    </code>
+
+    So we start by executing the body of the while, and when we finish, we test the condition.
+
+    <i style="display: block; white-space: pre-wrap;">
+        The for loop
+    </i>
+
+    The basic for loop works like this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        for (init; condition; step)
+        {
+            something;
+        }
+    </code>
+
+    So an example for a C program that uses for loops is:
+
+    <code style="display: block; white-space: pre-wrap;">
+    #include <stdio.h>
+
+int main(int argc, char **argv)
+{
+    int apples = 0;
+    int i = 0;
+
+    printf("How many apples do you have? ");
+    scanf("%d", &amp;apples);
+
+    for (i = apples; i &gt; 0; --i)
+    {
+        printf("[I ate an apple]\n");
+        printf("You now have: %d apples\n", i);
+    }
+
+    return 0;
+}
+
+    </code>
+
+    Note that this is exactly the while program but with for loops. Let's look at the assembly:
+
+    <code style="display: block; white-space: pre-wrap;">
+        [snip]
+
+        |       ,=&lt; 0x000011ca      eb2c           jmp 0x11f8
+|       |   ; CODE XREF from main @ 0x11fc
+|      .--&gt; 0x000011cc      488d05520e00.  lea rax, str._I_ate_an_apple_ ; 0x2025 ; "[I ate an apple]"
+|      :|   0x000011d3      4889c7         mov rdi, rax                ; const char *s
+|      :|   0x000011d6      e855feffff     call sym.imp.puts           ; int puts(const char *s)
+|      :|   0x000011db      8b45f4         mov eax, dword [var_ch]
+|      :|   0x000011de      89c6           mov esi, eax
+|      :|   0x000011e0      488d054f0e00.  lea rax, str.You_now_have:__d_apples_n ; 0x2036 ; "You now have: %d apples\n"
+|      :|   0x000011e7      4889c7         mov rdi, rax                ; const char *format
+|      :|   0x000011ea      b800000000     mov eax, 0
+|      :|   0x000011ef      e85cfeffff     call sym.imp.printf         ; int printf(const char *format)
+|      :|   0x000011f4      836df401       sub dword [var_ch], 1
+|      :|   ; CODE XREF from main @ 0x11ca
+|      :`-&gt; 0x000011f8      837df400       cmp dword [var_ch], 0
+|      `==&lt; 0x000011fc      7fce           jg 0x11cc
+        [snip]
+
+    </code>
+
+    So we start by jumping into the for loop body. then, we decrease i by 1 (the step) and then we compare i to 0 and jg to the body (the condition).
+
+    Rust only supports for-each loops which work like this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        for thing in list of things {
+            something
+        }
+    </code>
+
+    So let's write this program in Rust:
+
+    <code style="display: block; white-space: pre-wrap;">
+fn main() {
+    let mut apples = String::new();
+    let mut number_of_apples = 0;
+
+    println!("How many apples do you have? ");
+    std::io::stdin().read_line(&amp;mut apples).expect("Error while reading.");
+
+    match apples.trim().parse::&lt;u8&gt;() {
+        Ok(o) =&gt; {
+            number_of_apples = o;
+        }
+        Err(_) =&gt; {
+            panic!("Error while parsing.");
+        }
+    }
+
+    for curr in (0..number_of_apples).rev() {
+        println!("[I ate an apple]");
+        println!("You now have {} apples", curr);
+    }
+}
+    </code>
+
+    Here, we use a range and reverse it. so that would be for curr in number_of_apples to 0. Let's look at the assembly:
+
+    <code style="display: block; white-space: pre-wrap;">
+        
+[snip]
+| |   ; CODE XREF from loc.0000a52f @ 0xa5f8
+|     | `-&gt; 0x0000a600      8a8424b10000.  mov al, byte [arg_b1h]
+|     |     0x0000a607      8844245f       mov byte [arg_5fh], al
+|     |     0x0000a60b      8a44245f       mov al, byte [arg_5fh]
+|     |     0x0000a60f      c68424b80000.  mov byte [arg_b8h], 0
+|     |     0x0000a617      888424b90000.  mov byte [arg_b9h], al
+|     |     0x0000a61e      0fb6b424b900.  movzx esi, byte [arg_b9h]
+|     |     0x0000a626      0fb6bc24b800.  movzx edi, byte [arg_b8h]
+|     |     0x0000a62e      e86dfdffff     call sym core::iter::traits::iterator::Iterator::rev::ha7d3c2c422cbf8b2 ; sym.core::iter::traits::iterator::Iterator::rev::ha7d3c2c422cbf8b2
+|     |     0x0000a633      88542414       mov byte [arg_14h], dl
+|     |     0x0000a637      88442415       mov byte [arg_15h], al
+|     | ,=&lt; 0x0000a63b      eb1c           jmp 0xa659
+|     | |   ; CODE XREF from loc.0000a52f @ 0xa5fc
+|     `---&gt; 0x0000a63d      488d3d6e4a03.  lea rdi, [0x0003f0b2]       ; &quot;Error while parsing.[I ate an apple]
+You now have  apples
+invalid args/rustc/1.59.0/library/core/src/fmt/mod.rs&quot; ; int64_t arg1
+|       |   0x0000a644      488d15953b04.  lea rdx, [0x0004e1e0]       ; int64_t arg3
+|       |   0x0000a64b      be14000000     mov esi, 0x14               ; int64_t arg2
+|       |   0x0000a650      e8abecffff     call sym std::panicking::begin_panic::h5bb46c30c9174d60 ; sym.std::panicking::begin_panic::h5bb46c30c9174d60
+|      ,==&lt; 0x0000a655      eb00           jmp 0xa657
+|      ||   ; CODE XREF from loc.0000a52f @ 0xa655
+|      `--&gt; 0x0000a657      0f0b           ud2
+|       |   ; CODE XREF from loc.0000a52f @ 0xa63b
+|       `-&gt; 0x0000a659      8a442414       mov al, byte [arg_14h]
+|           0x0000a65d      8a4c2415       mov cl, byte [arg_15h]
+|           0x0000a661      0fb6f9         movzx edi, cl
+|           0x0000a664      0fb6f0         movzx esi, al
+|           0x0000a667      e824fdffff     call sym &lt;I as core::iter::traits::collect::IntoIterator&gt;::into_iter::hd12292891fbfb7eb ; sym._I_as_core::iter::traits::collect::IntoIterator_::into_iter::hd12292891fbfb7eb
+|           0x0000a66c      88542412       mov byte [arg_12h], dl
+|           0x0000a670      88442413       mov byte [arg_13h], al
+|       ,=&lt; 0x0000a674      eb00           jmp 0xa676
+|       |   ; CODE XREF from loc.0000a52f @ 0xa674
+|       `-&gt; 0x0000a676      8a442412       mov al, byte [arg_12h]
+|           0x0000a67a      8a4c2413       mov cl, byte [arg_13h]
+|           0x0000a67e      888c24c00000.  mov byte [arg_c0h], cl
+|           0x0000a685      888424c10000.  mov byte [arg_c1h], al
+|           ; CODE XREF from loc.0000a52f @ 0xa7a6
+|       .-&gt; 0x0000a68c      488dbc24c000.  lea rdi, [arg_c0h]          ; int64_t arg1
+|       :   0x0000a694      e827fcffff     call sym &lt;core::iter::adapters::rev::Rev&lt;I&gt; as core::iter::traits::iterator::Iterator&gt;::next::hbe94341af4a4ba29 ; sym._core::iter::adapters::rev::Rev_I__as_core::iter::traits::iterator::Iterator_::next::hbe94341af4a4ba29
+|       :   0x0000a699      88542410       mov byte [arg_10h], dl
+|       :   0x0000a69d      88442411       mov byte [arg_11h], al
+|      ,==&lt; 0x0000a6a1      eb00           jmp 0xa6a3
+|      |:   ; CODE XREF from loc.0000a52f @ 0xa6a1
+|      `--&gt; 0x0000a6a3      8a442410       mov al, byte [arg_10h]
+|       :   0x0000a6a7      8a4c2411       mov cl, byte [arg_11h]
+|       :   0x0000a6ab      888c24c80000.  mov byte [arg_c8h], cl
+|       :   0x0000a6b2      888424c90000.  mov byte [arg_c9h], al
+|       :   0x0000a6b9      0fb68424c800.  movzx eax, byte [arg_c8h]
+|       :   0x0000a6c1      a801           test al, 1
+|      ,==&lt; 0x0000a6c3      7406           je 0xa6cb
+|     ,===&lt; 0x0000a6c5      eb00           jmp 0xa6c7
+|     ||:   ; CODE XREF from loc.0000a52f @ 0xa6c5
+|    ,`---&gt; 0x0000a6c7      eb11           jmp 0xa6da
+..
+|    | |:   ; CODE XREF from loc.0000a52f @ 0xa6c3
+|    | `--&gt; 0x0000a6cb      488d7c2440     lea rdi, [arg_40h]          ; int64_t arg1
+|    |  :   0x0000a6d0      e86bfaffff     call sym core::ptr::drop_in_place&lt;alloc::string::String&gt;::h49a9a8ecb2a5913a ; sym.core::ptr::drop_in_place_alloc::string::String_::h49a9a8ecb2a5913a
+|    | ,==&lt; 0x0000a6d5      e9e0000000     jmp 0xa7ba
+|    | |:   ; CODE XREF from loc.0000a52f @ 0xa6c7
+|    `----&gt; 0x0000a6da      8a8424c90000.  mov al, byte [arg_c9h]
+|      |:   0x0000a6e1      888424cf0000.  mov byte [arg_cfh], al
+|      |:   0x0000a6e8      488d35093b04.  lea rsi, [0x0004e1f8]       ; int64_t arg2
+|      |:   0x0000a6ef      488d0d9a4903.  lea rcx, str.Error_while_reading.forEachRust.rsError_while_parsing._I_ate_an_apple__nYou_now_have__apples_ninvalid_args_rustc_1.59.0_library_core_src_fmt_mod.rs ; 0x3f090 ; &quot;Error while reading.forEachRust.rsError while parsing.[I ate an apple]
+You now have  apples
+invalid args/rustc/1.59.0/library/core/src/fmt/mod.rs&quot; ; int64_t arg4
+|      |:   0x0000a6f6      31c0           xor eax, eax
+|      |:   0x0000a6f8      4189c0         mov r8d, eax                ; int64_t arg5
+|      |:   0x0000a6fb      488dbc24d000.  lea rdi, [arg_d0h]          ; int64_t arg1
+|      |:   0x0000a703      ba01000000     mov edx, 1                  ; int64_t arg3
+|      |:   0x0000a708      e8130a0000     call sym core::fmt::Arguments::new_v1::h7bca2a9a4f660047 ; sym.core::fmt::Arguments::new_v1::h7bca2a9a4f660047
+|     ,===&lt; 0x0000a70d      eb00           jmp 0xa70f
+|     ||:   ; CODE XREF from loc.0000a52f @ 0xa70d
+|     `---&gt; 0x0000a70f      488d052a1201.  lea rax, [dbg._print]       ; 0x1b940 ; &quot;UAWAVATSHì°&quot;
+|      |:   0x0000a716      488dbc24d000.  lea rdi, [arg_d0h]
+|      |:   0x0000a71e      ffd0           call rax
+|     ,===&lt; 0x0000a720      eb00           jmp 0xa722
+|     ||:   ; CODE XREF from loc.0000a52f @ 0xa720
+|     `---&gt; 0x0000a722      488d8424cf00.  lea rax, [arg_cfh]
+|      |:   0x0000a72a      488984244001.  mov qword [arg_140h], rax
+§N&quot; ; int64_t arg2     488bbc244001.  mov rdi, qword [arg_140h]   ; int64_t arg1                                                                                   ÑÁê
+|      |:   0x0000a741      e88a090000     call sym core::fmt::ArgumentV1::new::hefeb59c0476be0bf ; sym.core::fmt::ArgumentV1::new::hefeb59c0476be0bf&quot;Hì(¶Høcv-¶ȍ	   kÊd(È¶ÀH
+|      |:   0x0000a746      48891424       mov qword [rsp], rdx
+|      |:   0x0000a74a      4889442408     mov qword [arg_8h], rax
+|     ,===&lt; 0x0000a74f      eb00           jmp 0xa751
+|     ||:   ; CODE XREF from loc.0000a52f @ 0xa74f
+|     `---&gt; 0x0000a751      488b0424       mov rax, qword [rsp]
+|      |:   0x0000a755      488b4c2408     mov rcx, qword [arg_8h]
+|      |:   0x0000a75a      48898c243001.  mov qword [arg_130h], rcx
+|      |:   0x0000a762      488984243801.  mov qword [arg_138h], rax
+|      |:   0x0000a76a      488d35973a04.  lea rsi, [0x0004e208]       ; int64_t arg2
+|      |:   0x0000a771      488dbc240001.  lea rdi, [arg_100h]         ; int64_t arg1
+|      |:   0x0000a779      ba02000000     mov edx, 2                  ; int64_t arg3
+|      |:   0x0000a77e      488d8c243001.  lea rcx, [arg_130h]         ; int64_t arg4
+|      |:   0x0000a786      41b801000000   mov r8d, 1                  ; int64_t arg5
+|      |:   0x0000a78c      e88f090000     call sym core::fmt::Arguments::new_v1::h7bca2a9a4f660047 ; sym.core::fmt::Arguments::new_v1::h7bca2a9a4f660047
+|     ,===&lt; 0x0000a791      eb00           jmp 0xa793
+|     ||:   ; CODE XREF from loc.0000a52f @ 0xa791
+|     `---&gt; 0x0000a793      488d05a61101.  lea rax, [dbg._print]       ; 0x1b940 ; &quot;UAWAVATSHì°&quot;
+|      |:   0x0000a79a      488dbc240001.  lea rdi, [arg_100h]
+|      |:   0x0000a7a2      ffd0           call rax
+[snip]
+    </code>
+
+    So we first create the iterator. we move 0 into var_b8h and number_of_apples into var_b9h and then call the iterator maker. then we reverse it and start with the body.
+
+    <i style="display: block; white-space: pre-wrap;">
+        The switch statement in C
+    </i>
+
+    The switch statement works like this: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        switch (number) {
+        case case1:
+            something
+        case case2:
+            something2
+        ...
+
+        default:
+            something3
+    </code>
+
+    So here's an example of a C program with a switch statement: 
+
+    <code style="display: block; white-space: pre-wrap;">
+#include &lt;stdio.h&gt;
+
+int main(int argc, char **argv)
+{
+    int appleFan = 0;
+
+    printf("How much do you like apples (On a scale of 1-3)? ");
+    scanf("%d", &amp;appleFan);
+
+    switch (appleFan)
+    {
+        case 1:
+            printf("Why do you hate apples so much? \n");
+            break;
+        case 2:
+            printf("I can understand that...\n");
+            break;
+        case 3:
+            printf("Me too!!\n");
+            break;
+        default:
+            printf("on a scale of 1 TO 3\n");
+            break;
+    }
+
+    return 0;
+}
+    </code>
+
+    Let's look at the assembly:
+
+    <code style="display: block; white-space: pre-wrap;">
+[snip]
+        |           0x000011bd      8b45f4         mov eax, dword [var_ch]
+|           0x000011c0      83f803         cmp eax, 3
+|       ,=&lt; 0x000011c3      7433           je 0x11f8
+|       |   0x000011c5      83f803         cmp eax, 3
+|      ,==&lt; 0x000011c8      7f3f           jg 0x1209
+|      ||   0x000011ca      83f801         cmp eax, 1
+|     ,===&lt; 0x000011cd      7407           je 0x11d6
+|     |||   0x000011cf      83f802         cmp eax, 2
+|    ,====&lt; 0x000011d2      7413           je 0x11e7
+|   ,=====&lt; 0x000011d4      eb33           jmp 0x1209
+|   |||||   ; CODE XREF from main @ 0x11cd
+|   ||`---&gt; 0x000011d6      488d05630e00.  lea rax, str.Why_do_you_hate_apples_so_much__ ; 0x2040 ; "Why do you hate apples so much? "
+|   || ||   0x000011dd      4889c7         mov rdi, rax                ; const char *s
+|   || ||   0x000011e0      e84bfeffff     call sym.imp.puts           ; int puts(const char *s)
+|   ||,===&lt; 0x000011e5      eb32           jmp 0x1219
+|   |||||   ; CODE XREF from main @ 0x11d2
+|   |`----&gt; 0x000011e7      488d05730e00.  lea rax, str.I_can_understand_that... ; 0x2061 ; "I can understand that..."
+|   | |||   0x000011ee      4889c7         mov rdi, rax                ; const char *s
+|   | |||   0x000011f1      e83afeffff     call sym.imp.puts           ; int puts(const char *s)
+|   |,====&lt; 0x000011f6      eb21           jmp 0x1219
+|   |||||   ; CODE XREF from main @ 0x11c3
+|   ||||`-&gt; 0x000011f8      488d057b0e00.  lea rax, str.Me_too__       ; 0x207a ; "Me too!!"
+|   ||||    0x000011ff      4889c7         mov rdi, rax                ; const char *s
+|   ||||    0x00001202      e829feffff     call sym.imp.puts           ; int puts(const char *s)
+|   ||||,=&lt; 0x00001207      eb10           jmp 0x1219
+|   |||||   ; CODE XREFS from main @ 0x11c8, 0x11d4
+|   `--`--&gt; 0x00001209      488d05730e00.  lea rax, str.on_a_scale_of_1_TO_3 ; 0x2083 ; "on a scale of 1 TO 3"
+|    || |   0x00001210      4889c7         mov rdi, rax                ; const char *s
+|    || |   0x00001213      e818feffff     call sym.imp.puts           ; int puts(const char *s)
+|    || |   0x00001218      90             nop
+|    || |   ; CODE XREFS from main @ 0x11e5, 0x11f6, 0x1207
+|    ``-`-&gt; 0x00001219      b800000000     mov eax, 0
+   [snip]
+    </code>
+    
+    So we first compare eax to 3. if it is equal we jump to case 3. than we do the same thing but jg to the default case. now we do the same thing for case 1 and 2 and then jump to the DEFAULT case. On all cases
+    we jump to exiting the program when we finish.
+    
+    <strong style="display: block; white-space: pre-wrap;">
+        Hope you enjoyed!!!
+    </strong>
+
+    EOF
+
+    </p>
+</body>

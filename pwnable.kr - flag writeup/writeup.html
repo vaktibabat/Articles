@@ -1,0 +1,53 @@
+<head>
+    <title>pwnable.kr - flag writeup</title>
+</head>
+
+<body>
+    <b style="display: block; white-space: pre-wrap;">
+        Wer'e given a hint that the binary is packed. let's run strings on it:  
+    </b>
+
+    <p style="display: block; white-space: pre-wrap;">
+        <code style="display: block; white-space: pre-wrap;">
+            $&gt; strings ./flag | grep -i "packed"
+$Info: This file is packed with the UPX executable packer http://upx.sf.net $
+        </code>
+
+        So now, we can unpack this with
+        
+        <code style="display: block; white-space: pre-wrap;">
+            $&gt; upx -d ./flag
+                               Ultimate Packer for eXecutables
+                          Copyright (C) 1996 - 2020
+UPX git-d7ba31+ Markus Oberhumer, Laszlo Molnar &amp; John Reiser   Jan 23rd 2020
+
+        File size         Ratio      Format      Name
+   --------------------   ------   -----------   -----------
+    883745 &lt;-    335288   37.94%   linux/amd64   flag
+
+Unpacked 1 file.
+
+        </code>
+
+        Now let's gdb:
+
+        <code style="display: block; white-space: pre-wrap;">
+            Reading symbols from ./flag...
+(No debugging symbols found in ./flag)
+(gdb) disas main
+Dump of assembler code for function main:
+   0x0000000000401184 &lt;+32&gt;:	mov    0x2c0ee5(%rip),%rdx        # 0x6c2070 &lt;flag&gt;
+End of assembler dump.
+(gdb) x/s *0x6c2070
+0x496628:	"****************************"
+(gdb)
+        </code>
+
+        And we got it!
+
+        EOF
+    </p>
+</body>
+
+
+

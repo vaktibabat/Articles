@@ -1,0 +1,93 @@
+<head>
+    <title>pwnable.kr - random writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's start by looking at the source code: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+
+        int main(){
+        unsigned int random;
+        random = rand();	// random value!
+
+        unsigned int key=0;
+        scanf("%d", &amp;key);
+
+        if( (key ^ random) == 0xdeadbeef ){
+        printf("Good!\n");
+        system("/bin/cat flag");
+        return 0;
+        }
+
+        printf("Wrong, maybe you should try 2^32 cases.\n");
+        return 0;
+        }
+    </code>
+
+    So we generate a random value, but we don't seed the PRNG which means the "random" value will just be the same every time. let's see what it is with gdb:
+
+    <code style="display: block; white-space: pre-wrap;">
+        gdb) disas main
+        Dump of assembler code for function main:
+        0x00000000004005f4 &lt;+0&gt;:	push   %rbp
+        0x00000000004005f5 &lt;+1&gt;:	mov    %rsp,%rbp
+        0x00000000004005f8 &lt;+4&gt;:	sub    $0x10,%rsp
+        0x00000000004005fc &lt;+8&gt;:	mov    $0x0,%eax
+        0x0000000000400601 &lt;+13&gt;:	callq  0x400500 &lt;rand@plt&gt;
+        0x0000000000400606 &lt;+18&gt;:	mov    %eax,-0x4(%rbp)
+        0x0000000000400609 &lt;+21&gt;:	movl   $0x0,-0x8(%rbp)
+        0x0000000000400610 &lt;+28&gt;:	mov    $0x400760,%eax
+        0x0000000000400615 &lt;+33&gt;:	lea    -0x8(%rbp),%rdx
+        0x0000000000400619 &lt;+37&gt;:	mov    %rdx,%rsi
+        0x000000000040061c &lt;+40&gt;:	mov    %rax,%rdi
+        0x000000000040061f &lt;+43&gt;:	mov    $0x0,%eax
+        0x0000000000400624 &lt;+48&gt;:	callq  0x4004f0 &lt;__isoc99_scanf@plt&gt;
+        0x0000000000400629 &lt;+53&gt;:	mov    -0x8(%rbp),%eax
+        0x000000000040062c &lt;+56&gt;:	xor    -0x4(%rbp),%eax
+        0x000000000040062f &lt;+59&gt;:	cmp    $0xdeadbeef,%eax
+        0x0000000000400634 &lt;+64&gt;:	jne    0x400656 &lt;main+98&gt;
+        0x0000000000400636 &lt;+66&gt;:	mov    $0x400763,%edi
+        0x000000000040063b &lt;+71&gt;:	callq  0x4004c0 &lt;puts@plt&gt;
+        0x0000000000400640 &lt;+76&gt;:	mov    $0x400769,%edi
+        0x0000000000400645 &lt;+81&gt;:	mov    $0x0,%eax
+        0x000000000040064a &lt;+86&gt;:	callq  0x4004d0 &lt;system@plt&gt;
+        0x000000000040064f &lt;+91&gt;:	mov    $0x0,%eax
+        0x0000000000400654 &lt;+96&gt;:	jmp    0x400665 &lt;main+113&gt;
+        0x0000000000400656 &lt;+98&gt;:	mov    $0x400778,%edi
+        0x000000000040065b &lt;+103&gt;:	callq  0x4004c0 &lt;puts@plt&gt;
+        0x0000000000400660 &lt;+108&gt;:	mov    $0x0,%eax
+        0x0000000000400665 &lt;+113&gt;:	leaveq
+        0x0000000000400666 &lt;+114&gt;:	retq
+        End of assembler dump.
+        (gdb) b *main+18
+        Breakpoint 1 at 0x400606
+        (gdb) r
+        Starting program: /home/random/random
+
+        Breakpoint 1, 0x0000000000400606 in main ()
+        (gdb) p/d $eax
+        $1 = 1804289383
+        (gdb)
+    </code>
+
+    So now let's solve for the key:
+
+    key ^ random = 0xdeadbeef =&gt;
+    key ^ 1804289383 = 0xdeadbeef =&gt; (because x ^ x = 0) /^random
+    key ^ 0 = 0xdeadbeef ^ 1804289383 =&gt; (0 is neutral to the XOR operation)
+    key = 0xdeadbeef ^ 1804289383
+    key = 3039230856
+
+    Let's try that:
+
+    <code style="display: block; white-space: pre-wrap;">
+        random@pwnable:~$ ./random
+        3039230856
+        Good!
+        Mommy, I thought libc random is unpredictable...
+    </code>
+    </p>
+</body>

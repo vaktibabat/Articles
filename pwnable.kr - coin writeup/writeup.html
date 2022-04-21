@@ -1,0 +1,111 @@
+<head>
+    <title>pwnable.kr - coin writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So in this challenge we just get an nc connection. Let's connect to it:
+
+    <code style="display: block; white-space: pre-wrap;">
+
+        ---------------------------------------------------
+        -              Shall we play a game?              -
+        ---------------------------------------------------
+
+        You have given some gold coins in your hand
+        however, there is one counterfeit coin among them
+        counterfeit coin looks exactly same as real coin
+        however, its weight is different from real one
+        real coin weighs 10, counterfeit coin weighes 9
+        help me to find the counterfeit coin with a scale
+        if you find 100 counterfeit coins, you will get reward :)
+        FYI, you have 60 seconds.
+
+        - How to play - 
+        1. you get a number of coins (N) and number of chances (C)
+        2. then you specify a set of index numbers of coins to be weighed
+        3. you get the weight information
+        4. 2~3 repeats C time, then you give the answer
+
+        - Example -
+        [Server] N=4 C=2 	# find counterfeit among 4 coins with 2 trial
+        [Client] 0 1 		# weigh first and second coin
+        [Server] 20			# scale result : 20
+        [Client] 3			# weigh fourth coin
+        [Server] 10			# scale result : 10
+        [Client] 2 			# counterfeit coin is third!
+        [Server] Correct!
+
+        - Ready? starting in 3 sec... -
+    </code>
+
+    Okay. So we need to find an algorithm to find the counterfeit coin. Let's use binary search: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        from pwn import *
+        from re import findall
+
+        r = remote("127.0.0.1", 9007)
+        print(r.recv())
+
+        for i in range(100):
+            n, c = findall("N=(\d+) C=(\d+)", r.recv())[0]
+            n = int(n)
+            c = int(c)
+            print("{}, {}".format(n, c))
+
+            start = 0
+            end = n - 1
+
+            while start &lt;= end and c &fgt; 0:
+                mid = (start + end) // 2
+
+                pay = " ".join([str(x) for x in range(start, mid + 1)])
+
+                r.sendline(pay)
+
+                res = int(r.recvline()[:-1])
+
+                if res % 10 == 0:
+                    start = mid + 1
+                else:
+                    end = mid - 1
+
+                c -= 1
+
+                while c &gt; 0:
+                    r.sendline("0")
+                    tmp = r.recv(1024)
+                    print(tmp)
+                    c -= 1
+
+        print("Counterfeit coin is: ", start)
+
+        r.sendline(str(start))
+        print(r.recv()) 
+
+        print(r.recv()) 
+    </code>
+
+    So we start by opening a remote connection to the game server. Then, we use a for loop to execute the code inside 100 times. Note that we could've written this
+
+    <code style="display: block; white-space: pre-wrap;">
+        i = 0
+
+        while i &lt; 100:
+          do something
+
+          i += 1
+    </code>
+
+    We use regex to find the number of coins and the number of chances we have and then we print them. then we use binary search to find the counterfeit coin. we finish our chances to send the counterfeit coin
+    and then we print the flag:
+
+    <code style="display: block; white-space: pre-wrap;">
+       ....
+
+        Congrats! get your flag
+       **************************
+ </code>
+    </p>
+</body>

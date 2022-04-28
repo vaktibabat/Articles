@@ -1,0 +1,42 @@
+<head>
+    <title>pwnable.kr - blukat writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's start by LSing:
+
+    <code style="display: block; white-space: pre-wrap;">
+        blukat@pwnable:~$ ls -all
+        total 36
+        drwxr-x---   4 root blukat     4096 Aug 16  2018 .
+        drwxr-xr-x 116 root root       4096 Nov 11 14:52 ..
+        -r-xr-sr-x   1 root blukat_pwn 9144 Aug  8  2018 blukat
+        -rw-r--r--   1 root root        645 Aug  8  2018 blukat.c
+        dr-xr-xr-x   2 root root       4096 Aug 16  2018 .irssi
+        -rw-r-----   1 root blukat_pwn   33 Jan  6  2017 password
+        drwxr-xr-x   2 root root       4096 Aug 16  2018 .pwntools-cache
+    </code>
+
+    We can see that we have read permission to the password. let's cat it:
+
+    <code style="display: block; white-space: pre-wrap;">
+        blukat@pwnable:~$ cat password
+        cat: password: Permission denied
+    </code>
+
+    But we have read permission. So this is the password. Let's run the blukat binary with this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        blukat@pwnable:~$ ./blukat
+    guess the password!
+    cat: password: Permission denied
+    *************************************
+    </code>
+
+    Nice we got it!
+
+    EOF
+    </p>
+</body>
+

